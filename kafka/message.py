@@ -34,9 +34,9 @@ class Message(BaseModel):
     @property
     def serialized(self) -> bytes:
         return (
-            f"{self.headers.correlation_id:0{constants.CORRELATION_ID_WIDTH}d}"
+            (f"{self.headers.correlation_id:0{constants.CORRELATION_ID_WIDTH}d}"
             f"{self.headers.api_key:0{constants.API_KEY_WIDTH}d}"
-            f"{len(self.payload):0{constants.PAYLOAD_LENGTH_WIDTH}d}".encode("utf-8")
+            f"{len(self.payload):0{constants.PAYLOAD_LENGTH_WIDTH}d}").encode("utf-8")
             + self.payload
         )
 
