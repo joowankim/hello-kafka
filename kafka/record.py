@@ -16,6 +16,7 @@ class ProducerRecord(BaseModel):
     timestamp: int | None = None
     headers: dict[str, bytes] = Field(default_factory=dict)
 
+
 class ConsumerRecord(BaseModel):
     topic: str
     value: bytes
