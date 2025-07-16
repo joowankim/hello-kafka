@@ -2,6 +2,7 @@ from pathlib import Path
 
 import pytest
 
+from kafka import constants
 from kafka.broker.storage import FSLogStorage
 from kafka.error import InvalidAdminCommandError
 
@@ -160,3 +161,14 @@ def test_append_partitions(
     for filename in expected:
         file_path = tmp_path / filename
         assert file_path.exists()
+
+
+def test_init_partition(fs_log_storage: FSLogStorage, tmp_path: Path):
+    partition_path = tmp_path / "test-topic-0"
+    fs_log_storage.init_partition(topic_name="test-topic", partition_num=0)
+
+    log_file_path = partition_path / f"{0:0{constants.LOG_FILENAME_LENGTH}d}.log"
+    index_file_path = partition_path / f"{0:0{constants.LOG_FILENAME_LENGTH}d}.index"
+
+    assert log_file_path.exists()
+    assert index_file_path.exists()
