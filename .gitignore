@@ -307,3 +307,5 @@ node_modules/
 # Task files - store tasks in git but ignore sensitive config
 .taskmaster
 .env.example
+
+tmp
