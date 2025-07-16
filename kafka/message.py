@@ -60,5 +60,5 @@ class Message(BaseModel):
                 correlation_id=correlation_id,
                 api_key=api_key,
             ),
-            payload=payload,
+            payload=payload.encode("utf-8"),
         )

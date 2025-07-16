@@ -61,6 +61,10 @@ def test_serialized(message: Message, expected: bytes):
             b"0003020039{'topic': 'topic-3', 'value': 'value3'}",
             (3, 2, b"{'topic': 'topic-3', 'value': 'value3'}"),
         ),
+        (
+            "0001000035{'topic': 'topic-1', 'value': '안녕'}".encode("utf-8"),
+            (1, 0, "{'topic': 'topic-1', 'value': '안녕'}".encode("utf-8")),
+        ),
     ],
     indirect=["message"],
 )
