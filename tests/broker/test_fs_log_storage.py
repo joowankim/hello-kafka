@@ -186,6 +186,7 @@ def log_segment(base_log_segment: Segment, request: pytest.FixtureRequest) -> Se
             key=key,
             timestamp=timestamp,
             headers=headers,
+            offset=0,
         )
     )
 
@@ -197,14 +198,13 @@ def log_segment(base_log_segment: Segment, request: pytest.FixtureRequest) -> Se
             ("test-topic", 1),
             ("test-topic", 0, b"test-value", None, 1752735958, {}),
             (
-                b"0110"
+                b"0086"
                 b"{"
-                b'"topic":"test-topic",'
-                b'"partition":0,'
                 b'"value":"dGVzdC12YWx1ZQ==",'
                 b'"key":null,'
                 b'"timestamp":1752735958,'
-                b'"headers":{}'
+                b'"headers":{},'
+                b'"offset":0'
                 b"}"
             ),
         ),
@@ -212,14 +212,13 @@ def log_segment(base_log_segment: Segment, request: pytest.FixtureRequest) -> Se
             ("another-topic", 1),
             ("another-topic", 0, b"another-value", None, 1752735959, {}),
             (
-                b"0117"
+                b"0090"
                 b"{"
-                b'"topic":"another-topic",'
-                b'"partition":0,'
                 b'"value":"YW5vdGhlci12YWx1ZQ==",'
                 b'"key":null,'
                 b'"timestamp":1752735959,'
-                b'"headers":{}'
+                b'"headers":{},'
+                b'"offset":0'
                 b"}"
             ),
         ),
@@ -227,13 +226,13 @@ def log_segment(base_log_segment: Segment, request: pytest.FixtureRequest) -> Se
             ("test-topic", 3),
             ("test-topic", 1, b"additional-data", None, 1752735960, {}),
             (
-                b"0114"
-                b'{"topic":"test-topic",'
-                b'"partition":1,'
+                b"0090"
+                b"{"
                 b'"value":"YWRkaXRpb25hbC1kYXRh",'
                 b'"key":null,'
                 b'"timestamp":1752735960,'
-                b'"headers":{}'
+                b'"headers":{},'
+                b'"offset":0'
                 b"}"
             ),
         ),

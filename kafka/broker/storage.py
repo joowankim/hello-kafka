@@ -49,4 +49,5 @@ class FSLogStorage:
             raise PartitionNotFoundError("Partition test-topic-1 does not exist")
         log_file_path = partition_path / f"{0:0{constants.LOG_FILENAME_LENGTH}d}.log"
         with log_file_path.open("ab") as log_file:
+            # todo: log file의 크기가 충분히 커지면 다음 로그파일을 생성해서 기록하는 기능 추가
             log_file.write(segment.binary_record)
