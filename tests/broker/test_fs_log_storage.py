@@ -3,8 +3,9 @@ from pathlib import Path
 import pytest
 
 from kafka import constants
+from kafka.broker.log import Segment
 from kafka.broker.storage import FSLogStorage
-from kafka.error import InvalidAdminCommandError
+from kafka.error import InvalidAdminCommandError, PartitionNotFoundError
 
 
 @pytest.fixture
@@ -172,3 +173,72 @@ def test_init_partition(fs_log_storage: FSLogStorage, tmp_path: Path):
 
     assert log_file_path.exists()
     assert index_file_path.exists()
+
+
+@pytest.fixture
+def log_segment(base_log_segment: Segment, request: pytest.FixtureRequest) -> Segment:
+    topic_name, partition_num, value = request.param
+    return base_log_segment.model_copy(
+        update=dict(
+            topic=topic_name,
+            partition=partition_num,
+            value=value,
+        )
+    )
+
+
+@pytest.mark.parametrize(
+    "initiated_log_storage, log_segment, expected",
+    [
+        (
+            ("test-topic", 1),
+            ("test-topic", 0, b"test-value"),
+            b"test-value",
+        ),
+        (
+            ("another-topic", 1),
+            ("another-topic", 0, b"another-value"),
+            b"another-value",
+        ),
+        (
+            ("test-topic", 3),
+            ("test-topic", 1, b"additional-data"),
+            b"additional-data",
+        ),
+    ],
+    indirect=["initiated_log_storage", "log_segment"],
+)
+def test_append_log(
+    initiated_log_storage: FSLogStorage,
+    log_segment: Segment,
+    tmp_path: Path,
+    expected: bytes,
+):
+    initiated_log_storage.append_log(log_segment)
+
+    log_file_path = (
+        tmp_path
+        / log_segment.partition_dirname
+        / f"{0:0{constants.LOG_FILENAME_LENGTH}d}.log"
+    )
+    with open(log_file_path, "rb") as log_file:
+        assert log_file.read() == expected
+
+
+@pytest.mark.parametrize(
+    "initiated_log_storage, log_segment",
+    [
+        (
+            ("test-topic", 1),
+            ("test-topic", 1, b"test-value"),
+        ),
+    ],
+    indirect=["initiated_log_storage", "log_segment"],
+)
+def test_append_log_without_initiated_partition(
+    initiated_log_storage: FSLogStorage, log_segment: Segment, tmp_path: Path
+):
+    with pytest.raises(
+        PartitionNotFoundError, match="Partition test-topic-1 does not exist"
+    ):
+        initiated_log_storage.append_log(log_segment)

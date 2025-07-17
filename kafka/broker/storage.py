@@ -1,7 +1,8 @@
 from pathlib import Path
 
 from kafka import constants
-from kafka.error import InvalidAdminCommandError
+from kafka.broker import log
+from kafka.error import InvalidAdminCommandError, PartitionNotFoundError
 
 
 class FSLogStorage:
@@ -41,3 +42,11 @@ class FSLogStorage:
             existing_partitions, existing_partitions + num_partitions
         ):
             self.init_partition(topic_name=topic_name, partition_num=partition_num)
+
+    def append_log(self, segment: log.Segment) -> None:
+        partition_path = self.root_path / segment.partition_dirname
+        if not partition_path.exists():
+            raise PartitionNotFoundError("Partition test-topic-1 does not exist")
+        log_file_path = partition_path / f"{0:0{constants.LOG_FILENAME_LENGTH}d}.log"
+        with log_file_path.open("ab") as log_file:
+            log_file.write(segment.value)
