@@ -177,12 +177,15 @@ def test_init_partition(fs_log_storage: FSLogStorage, tmp_path: Path):
 
 @pytest.fixture
 def log_segment(base_log_segment: Segment, request: pytest.FixtureRequest) -> Segment:
-    topic_name, partition_num, value = request.param
+    topic_name, partition_num, value, key, timestamp, headers = request.param
     return base_log_segment.model_copy(
         update=dict(
             topic=topic_name,
             partition=partition_num,
             value=value,
+            key=key,
+            timestamp=timestamp,
+            headers=headers,
         )
     )
 
@@ -192,18 +195,47 @@ def log_segment(base_log_segment: Segment, request: pytest.FixtureRequest) -> Se
     [
         (
             ("test-topic", 1),
-            ("test-topic", 0, b"test-value"),
-            b"test-value",
+            ("test-topic", 0, b"test-value", None, 1752735958, {}),
+            (
+                b"0110"
+                b"{"
+                b'"topic":"test-topic",'
+                b'"partition":0,'
+                b'"value":"dGVzdC12YWx1ZQ==",'
+                b'"key":null,'
+                b'"timestamp":1752735958,'
+                b'"headers":{}'
+                b"}"
+            ),
         ),
         (
             ("another-topic", 1),
-            ("another-topic", 0, b"another-value"),
-            b"another-value",
+            ("another-topic", 0, b"another-value", None, 1752735959, {}),
+            (
+                b"0117"
+                b"{"
+                b'"topic":"another-topic",'
+                b'"partition":0,'
+                b'"value":"YW5vdGhlci12YWx1ZQ==",'
+                b'"key":null,'
+                b'"timestamp":1752735959,'
+                b'"headers":{}'
+                b"}"
+            ),
         ),
         (
             ("test-topic", 3),
-            ("test-topic", 1, b"additional-data"),
-            b"additional-data",
+            ("test-topic", 1, b"additional-data", None, 1752735960, {}),
+            (
+                b"0114"
+                b'{"topic":"test-topic",'
+                b'"partition":1,'
+                b'"value":"YWRkaXRpb25hbC1kYXRh",'
+                b'"key":null,'
+                b'"timestamp":1752735960,'
+                b'"headers":{}'
+                b"}"
+            ),
         ),
     ],
     indirect=["initiated_log_storage", "log_segment"],
@@ -230,7 +262,7 @@ def test_append_log(
     [
         (
             ("test-topic", 1),
-            ("test-topic", 1, b"test-value"),
+            ("test-topic", 1, b"test-value", None, 1752735960, {}),
         ),
     ],
     indirect=["initiated_log_storage", "log_segment"],

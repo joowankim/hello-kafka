@@ -49,4 +49,4 @@ class FSLogStorage:
             raise PartitionNotFoundError("Partition test-topic-1 does not exist")
         log_file_path = partition_path / f"{0:0{constants.LOG_FILENAME_LENGTH}d}.log"
         with log_file_path.open("ab") as log_file:
-            log_file.write(segment.value)
+            log_file.write(segment.binary_record)
