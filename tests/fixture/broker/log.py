@@ -12,4 +12,5 @@ def base_log_segment() -> Segment:
         key=None,
         timestamp=1752735958,
         headers={},
+        offset=0,
     )
