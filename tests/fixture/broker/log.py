@@ -1,11 +1,11 @@
 import pytest
 
-from kafka.broker.log import Segment
+from kafka.broker.log import Record
 
 
 @pytest.fixture
-def base_log_segment() -> Segment:
-    return Segment(
+def base_log_record() -> Record:
+    return Record(
         topic="test-topic",
         partition=0,
         value=b"test-value",

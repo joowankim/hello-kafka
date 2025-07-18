@@ -2,13 +2,13 @@ from pathlib import Path
 
 import pytest
 
-from kafka.broker.log import Segment
+from kafka.broker.log import Record
 
 
 @pytest.fixture
-def log_segment(base_log_segment: Segment, request: pytest.FixtureRequest) -> Segment:
+def log_record(base_log_record: Record, request: pytest.FixtureRequest) -> Record:
     topic_name, partition_num, value, key, timestamp, headers, offset = request.param
-    return base_log_segment.model_copy(
+    return base_log_record.model_copy(
         update=dict(
             topic=topic_name,
             partition=partition_num,
@@ -22,7 +22,7 @@ def log_segment(base_log_segment: Segment, request: pytest.FixtureRequest) -> Se
 
 
 @pytest.mark.parametrize(
-    "log_segment, expected",
+    "log_record, expected",
     [
         (("test-topic", 0, b"hello", None, 1752735958, {}, 0), Path("test-topic-0")),
         (
@@ -30,14 +30,14 @@ def log_segment(base_log_segment: Segment, request: pytest.FixtureRequest) -> Se
             Path("another-topic-2"),
         ),
     ],
-    indirect=["log_segment"],
+    indirect=["log_record"],
 )
-def test_partition_dirname(log_segment: Segment, expected: Path):
-    assert log_segment.partition_dirname == expected
+def test_partition_dirname(log_record: Record, expected: Path):
+    assert log_record.partition_dirname == expected
 
 
 @pytest.mark.parametrize(
-    "log_segment, expected",
+    "log_record, expected",
     [
         (
             ("test-topic", 0, b"test-value", None, 1752735958, {}, 0),
@@ -65,20 +65,20 @@ def test_partition_dirname(log_segment: Segment, expected: Path):
             ),
         ),
     ],
-    indirect=["log_segment"],
+    indirect=["log_record"],
 )
-def test_binary_record(log_segment: Segment, expected: bytes):
-    assert log_segment.binary_record == expected
+def test_bin(log_record: Record, expected: bytes):
+    assert log_record.bin == expected
 
 
 @pytest.mark.parametrize(
-    "log_segment, expected",
+    "log_record, expected",
     [
         (("test-topic", 0, b"test-value", None, 1752735958, {}, 0), True),
         (("another-topic", 1, b"another-value", None, 1752735959, {}, 3), True),
         (("test-topic", 2, b"yet-another-value", None, 1752735960, {}, None), False),
     ],
-    indirect=["log_segment"],
+    indirect=["log_record"],
 )
-def test_is_recorded(log_segment: Segment, expected: bool):
-    assert log_segment.is_recorded is expected
+def test_is_recorded(log_record: Record, expected: bool):
+    assert log_record.is_recorded is expected

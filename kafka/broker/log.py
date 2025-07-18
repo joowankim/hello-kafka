@@ -4,7 +4,7 @@ from pathlib import Path
 from pydantic import BaseModel
 
 
-class Segment(BaseModel):
+class Record(BaseModel):
     topic: str
     partition: int
     value: bytes
@@ -22,7 +22,7 @@ class Segment(BaseModel):
         return Path(f"{self.topic}-{self.partition}")
 
     @property
-    def binary_record(self) -> bytes:
+    def bin(self) -> bytes:
         encoded_value = base64.b64encode(self.value)
         encoded_key = self.key and base64.b64encode(self.key)
         encoded_headers = {k: base64.b64encode(v) for k, v in self.headers.items()}
