@@ -1,8 +1,10 @@
 from pathlib import Path
+from typing import Any
 
 import pytest
 
 from kafka.broker.log import Record
+from kafka.error import InvalidOffsetError
 
 
 @pytest.fixture
@@ -71,14 +73,60 @@ def test_bin(log_record: Record, expected: bytes):
     assert log_record.bin == expected
 
 
+@pytest.fixture
+def recorded(base_log_record: Record, request: pytest.FixtureRequest) -> Record:
+    record_params: dict[str, Any] = request.param
+    return base_log_record.model_copy(update=record_params)
+
+
 @pytest.mark.parametrize(
-    "log_record, expected",
+    "log_record, offset, recorded",
     [
-        (("test-topic", 0, b"test-value", None, 1752735958, {}, 0), True),
-        (("another-topic", 1, b"another-value", None, 1752735959, {}, 3), True),
-        (("test-topic", 2, b"yet-another-value", None, 1752735960, {}, None), False),
+        (
+            ("test-topic", 0, b"test-value", None, 1752735958, {}, None),
+            1,
+            dict(
+                topic="test-topic",
+                partition=0,
+                value=b"test-value",
+                key=None,
+                timestamp=1752735958,
+                headers={},
+                offset=1,
+            ),
+        ),
     ],
-    indirect=["log_record"],
+    indirect=["log_record", "recorded"],
 )
-def test_is_recorded(log_record: Record, expected: bool):
-    assert log_record.is_recorded is expected
+def test_record_at(log_record: Record, offset: int, recorded: Record):
+    recorded = log_record.record_at(offset)
+
+    assert recorded == recorded
+
+
+@pytest.mark.parametrize(
+    "log_record",
+    [
+        ("test-topic", 0, b"test-value", None, 1752735958, {}, 0),
+        ("test-topic", 0, b"test-value", None, 1752735958, {}, 1),
+    ],
+    indirect=True,
+)
+def test_record_at_with_already_recorded(log_record: Record):
+    offset = 1
+
+    with pytest.raises(InvalidOffsetError):
+        log_record.record_at(offset)
+
+
+@pytest.mark.parametrize(
+    "log_record",
+    [
+        ("test-topic", 0, b"test-value", None, 1752735958, {}, None),
+        ("another-topic", 1, b"another-value", None, 1752735959, {}, None),
+    ],
+    indirect=True,
+)
+def test_convert_to_binary_without_offset(log_record: Record):
+    with pytest.raises(InvalidOffsetError):
+        log_record.bin

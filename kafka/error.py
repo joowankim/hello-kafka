@@ -32,3 +32,9 @@ class PartitionNotFoundError(KafkaError):
     """파티션을 찾을 수 없는 경우 발생하는 예외"""
 
     pass
+
+
+class InvalidOffsetError(KafkaError):
+    """잘못된 오프셋에 대한 예외"""
+
+    pass
