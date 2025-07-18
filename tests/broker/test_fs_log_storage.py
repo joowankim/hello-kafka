@@ -1,3 +1,4 @@
+import shutil
 from pathlib import Path
 
 import pytest
@@ -6,6 +7,34 @@ from kafka import constants
 from kafka.broker.log import Segment
 from kafka.broker.storage import FSLogStorage
 from kafka.error import InvalidAdminCommandError, PartitionNotFoundError
+
+
+@pytest.fixture
+def root_path(
+    resource_dir: Path, tmp_path: Path, request: pytest.FixtureRequest
+) -> Path:
+    root_dirname: str = request.param
+    root_path = resource_dir / "roots" / root_dirname
+    shutil.copytree(root_path, tmp_path, dirs_exist_ok=True)
+    return tmp_path
+
+
+@pytest.mark.parametrize(
+    "root_path, expected",
+    [
+        ("root-empty", {}),
+        ("root-limit_1GB", {("topic01", 0): 0, ("topic01", 1): 0}),
+        ("root-limit_100B", {("topic01", 0): 86, ("topic01", 1): 0}),
+    ],
+    indirect=["root_path"],
+)
+def test_load_from_root(root_path: Path, expected: dict[tuple[str, int], int]):
+    log_file_size_limit = constants.LOG_FILE_SIZE_LIMIT
+    log_storage = FSLogStorage.load_from_root(
+        root_path=root_path, log_file_size_limit=log_file_size_limit
+    )
+
+    assert log_storage.leo_map == expected
 
 
 @pytest.fixture

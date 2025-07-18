@@ -1,4 +1,7 @@
+import base64
+import re
 from pathlib import Path
+from typing import Self, ClassVar
 
 from kafka import constants
 from kafka.broker import log
@@ -6,10 +9,45 @@ from kafka.error import InvalidAdminCommandError, PartitionNotFoundError
 
 
 class FSLogStorage:
-    def __init__(self, root_path: Path):
+    record_pattern: ClassVar[re.Pattern] = re.compile(
+        r"(?P<size>\d{4})(?P<payload>{.*})"
+    )
+
+    def __init__(
+        self,
+        root_path: Path,
+        log_file_size_limit: int,
+        leo_map: dict[tuple[str, int], int],
+    ):
         self.root_path = root_path
+        self.log_file_size_limit = log_file_size_limit
+        self.leo_map = leo_map
         if not root_path.exists():
             root_path.mkdir(parents=True, exist_ok=True)
+
+    @classmethod
+    def load_from_root(cls, root_path: Path, log_file_size_limit: int) -> Self:
+        leo_map = {}
+        for partition_path in root_path.glob("*-*"):
+            topic_name, partition_num = partition_path.name.split("-")
+            log_end_segment_id = max(int(p.stem) for p in partition_path.glob("*.log"))
+            with (
+                partition_path
+                / f"{log_end_segment_id:0{constants.LOG_FILENAME_LENGTH}d}.log"
+            ).open("rb") as log_file:
+                logs = log_file.read()
+                decoded = base64.b64decode(logs).decode("utf-8")
+                record_lengths = list(
+                    int(record["size"])
+                    for record in cls.record_pattern.finditer(decoded)
+                )
+                log_end_offset = log_end_segment_id + sum(record_lengths)
+            leo_map[(topic_name, int(partition_num))] = log_end_offset
+        return cls(
+            root_path=root_path,
+            log_file_size_limit=log_file_size_limit,
+            leo_map=leo_map,
+        )
 
     def init_partition(self, topic_name: str, partition_num: int) -> None:
         partition_path = self.root_path / f"{topic_name}-{partition_num}"
