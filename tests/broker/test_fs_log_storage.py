@@ -15,6 +15,7 @@ def root_path(
 ) -> Path:
     root_dirname: str = request.param
     root_path = resource_dir / "roots" / root_dirname
+    root_path.mkdir(parents=True, exist_ok=True)
     shutil.copytree(root_path, tmp_path, dirs_exist_ok=True)
     return tmp_path
 
@@ -365,6 +366,7 @@ def logged_log_storage(
 ) -> FSLogStorage:
     root_dirname, log_file_size_limit = request.param
     root_path = resource_dir / "roots" / root_dirname
+    root_path.mkdir(parents=True, exist_ok=True)
     shutil.copytree(root_path, tmp_path, dirs_exist_ok=True)
     return FSLogStorage.load_from_root(
         root_path=tmp_path, log_file_size_limit=log_file_size_limit
