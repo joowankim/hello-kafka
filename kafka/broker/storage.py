@@ -106,6 +106,8 @@ class FSLogStorage:
             log_file.write(new_record_binary)
         with index_path.open("ab") as index_file:
             index_file.write(
-                f"{new_record.offset:08d}{new_log_file_size:08d}".encode("utf-8")
+                f"{new_record.offset:0{constants.LOG_RECORD_OFFSET_WIDTH}d}{new_log_file_size:0{constants.LOG_RECORD_POSITION_WIDTH}d}".encode(
+                    "utf-8"
+                )
             )
         self.leo_map[(record.topic, record.partition)] += 1
