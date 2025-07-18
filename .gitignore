@@ -147,14 +147,6 @@ cover/
 *.mo
 *.pot
 
-# Django stuff:
-*.log
-!tests/resource/
-!tests/resource/*.log
-local_settings.py
-db.sqlite3
-db.sqlite3-journal
-
 # Flask stuff:
 instance/
 .webassets-cache
@@ -311,3 +303,6 @@ node_modules/
 .env.example
 
 tmp
+
+!tests/resource/
+!tests/resource/*.log
