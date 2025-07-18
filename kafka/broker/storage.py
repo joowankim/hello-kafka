@@ -1,4 +1,3 @@
-import base64
 import re
 from pathlib import Path
 from typing import Self, ClassVar
@@ -36,12 +35,9 @@ class FSLogStorage:
                 / f"{log_end_segment_id:0{constants.LOG_FILENAME_LENGTH}d}.log"
             ).open("rb") as log_file:
                 logs = log_file.read()
-                decoded = base64.b64decode(logs).decode("utf-8")
-                record_lengths = list(
-                    int(record["size"])
-                    for record in cls.record_pattern.finditer(decoded)
-                )
-                log_end_offset = log_end_segment_id + sum(record_lengths)
+                decoded = logs.decode("utf-8")
+                records = list(cls.record_pattern.finditer(decoded))
+                log_end_offset = log_end_segment_id + len(records)
             leo_map[(topic_name, int(partition_num))] = log_end_offset
         return cls(
             root_path=root_path,
@@ -59,6 +55,7 @@ class FSLogStorage:
             partition_path / f"{0:0{constants.LOG_FILENAME_LENGTH}d}.index"
         )
         index_file_path.touch()
+        self.leo_map[(topic_name, partition_num)] = 0
 
     def init_topic(self, topic_name: str, num_partitions: int) -> None:
         if num_partitions <= 0:
@@ -81,11 +78,34 @@ class FSLogStorage:
         ):
             self.init_partition(topic_name=topic_name, partition_num=partition_num)
 
-    def append_log(self, segment: log.Segment) -> None:
-        partition_path = self.root_path / segment.partition_dirname
+    def append_log(self, record: log.Record) -> None:
+        partition_path = self.root_path / record.partition_dirname
         if not partition_path.exists():
             raise PartitionNotFoundError("Partition test-topic-1 does not exist")
-        log_file_path = partition_path / f"{0:0{constants.LOG_FILENAME_LENGTH}d}.log"
-        with log_file_path.open("ab") as log_file:
-            # todo: log file의 크기가 충분히 커지면 다음 로그파일을 생성해서 기록하는 기능 추가
-            log_file.write(segment.binary_record)
+        segment_id = max(int(p.stem) for p in partition_path.glob("*.log"))
+        log_path = (
+            partition_path / f"{segment_id:0{constants.LOG_FILENAME_LENGTH}d}.log"
+        )
+        index_path = (
+            partition_path / f"{segment_id:0{constants.LOG_FILENAME_LENGTH}d}.index"
+        )
+        new_record = record.record_at(self.leo_map[(record.topic, record.partition)])
+        new_record_binary = new_record.bin
+        new_log_file_size = log_path.stat().st_size + len(new_record_binary)
+        if new_log_file_size > self.log_file_size_limit:
+            segment_id += 1
+            log_path = (
+                partition_path / f"{segment_id:0{constants.LOG_FILENAME_LENGTH}d}.log"
+            )
+            index_path = (
+                partition_path / f"{segment_id:0{constants.LOG_FILENAME_LENGTH}d}.index"
+            )
+            log_path.touch()
+            index_path.touch()
+        with log_path.open("ab") as log_file:
+            log_file.write(new_record_binary)
+        with index_path.open("ab") as index_file:
+            index_file.write(
+                f"{new_record.offset:08d}{new_log_file_size:08d}".encode("utf-8")
+            )
+        self.leo_map[(record.topic, record.partition)] += 1

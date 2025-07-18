@@ -44,6 +44,6 @@ class Record(BaseModel):
     def record_at(self, offset: int) -> Self:
         if self.offset is not None:
             raise InvalidOffsetError(
-                "Offset must be set before converting to binary format"
+                "Offset is already set, cannot create a new record at a different offset"
             )
         return self.model_copy(deep=True, update={"offset": offset})

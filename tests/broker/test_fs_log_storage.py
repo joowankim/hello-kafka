@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 
 from kafka import constants
-from kafka.broker.log import Segment
+from kafka.broker.log import Record
 from kafka.broker.storage import FSLogStorage
 from kafka.error import InvalidAdminCommandError, PartitionNotFoundError
 
@@ -23,8 +23,8 @@ def root_path(
     "root_path, expected",
     [
         ("root-empty", {}),
-        ("root-limit_1GB", {("topic01", 0): 0, ("topic01", 1): 0}),
-        ("root-limit_100B", {("topic01", 0): 86, ("topic01", 1): 0}),
+        ("root-limit_1GB", {("topic01", 0): 1, ("topic01", 1): 0}),
+        ("root-limit_100B", {("topic01", 0): 1, ("topic01", 1): 0}),
     ],
     indirect=["root_path"],
 )
@@ -40,7 +40,11 @@ def test_load_from_root(root_path: Path, expected: dict[tuple[str, int], int]):
 @pytest.fixture
 def fs_log_storage(tmp_path: Path) -> FSLogStorage:
     root_path = tmp_path
-    return FSLogStorage(root_path=root_path)
+    return FSLogStorage(
+        root_path=root_path,
+        log_file_size_limit=constants.LOG_FILE_SIZE_LIMIT,
+        leo_map={},
+    )
 
 
 @pytest.mark.parametrize(
@@ -49,32 +53,41 @@ def fs_log_storage(tmp_path: Path) -> FSLogStorage:
         (
             "test-topic",
             1,
-            [
-                Path("test-topic-0"),
-                Path("test-topic-0/00000000000000000000.log"),
-                Path("test-topic-0/00000000000000000000.index"),
-            ],
+            (
+                {("test-topic", 0): 0},
+                [
+                    Path("test-topic-0"),
+                    Path("test-topic-0/00000000000000000000.log"),
+                    Path("test-topic-0/00000000000000000000.index"),
+                ],
+            ),
         ),
         (
             "test-topic",
             2,
-            [
-                Path("test-topic-0"),
-                Path("test-topic-0/00000000000000000000.log"),
-                Path("test-topic-0/00000000000000000000.index"),
-                Path("test-topic-1"),
-                Path("test-topic-1/00000000000000000000.log"),
-                Path("test-topic-1/00000000000000000000.index"),
-            ],
+            (
+                {("test-topic", 0): 0, ("test-topic", 1): 0},
+                [
+                    Path("test-topic-0"),
+                    Path("test-topic-0/00000000000000000000.log"),
+                    Path("test-topic-0/00000000000000000000.index"),
+                    Path("test-topic-1"),
+                    Path("test-topic-1/00000000000000000000.log"),
+                    Path("test-topic-1/00000000000000000000.index"),
+                ],
+            ),
         ),
         (
             "another-topic",
             1,
-            [
-                Path("another-topic-0"),
-                Path("another-topic-0/00000000000000000000.log"),
-                Path("another-topic-0/00000000000000000000.index"),
-            ],
+            (
+                {("another-topic", 0): 0},
+                [
+                    Path("another-topic-0"),
+                    Path("another-topic-0/00000000000000000000.log"),
+                    Path("another-topic-0/00000000000000000000.index"),
+                ],
+            ),
         ),
     ],
 )
@@ -83,11 +96,13 @@ def test_init_topic(
     topic_name: str,
     num_partitions: int,
     tmp_path: Path,
-    expected: list[Path],
+    expected: tuple[dict[tuple[str, int], int], list[Path]],
 ):
     fs_log_storage.init_topic(topic_name=topic_name, num_partitions=num_partitions)
 
-    for filename in expected:
+    leo_map, paths = expected
+    assert fs_log_storage.leo_map == leo_map
+    for filename in paths:
         file_path = tmp_path / filename
         assert file_path.exists()
 
@@ -109,7 +124,11 @@ def initiated_log_storage(
     tmp_path: Path, request: pytest.FixtureRequest
 ) -> FSLogStorage:
     topic_name, num_partitions = request.param
-    log_storage = FSLogStorage(root_path=tmp_path)
+    log_storage = FSLogStorage(
+        root_path=tmp_path,
+        log_file_size_limit=constants.LOG_FILE_SIZE_LIMIT,
+        leo_map={},
+    )
     log_storage.init_topic(topic_name=topic_name, num_partitions=num_partitions)
     return log_storage
 
@@ -121,58 +140,82 @@ def initiated_log_storage(
             ("test-topic", 3),
             "test-topic",
             1,
-            [
-                Path("test-topic-0"),
-                Path("test-topic-0/00000000000000000000.log"),
-                Path("test-topic-0/00000000000000000000.index"),
-                Path("test-topic-1"),
-                Path("test-topic-1/00000000000000000000.log"),
-                Path("test-topic-1/00000000000000000000.index"),
-                Path("test-topic-2"),
-                Path("test-topic-2/00000000000000000000.log"),
-                Path("test-topic-2/00000000000000000000.index"),
-                Path("test-topic-3"),
-                Path("test-topic-3/00000000000000000000.log"),
-                Path("test-topic-3/00000000000000000000.index"),
-            ],
+            (
+                {
+                    ("test-topic", 0): 0,
+                    ("test-topic", 1): 0,
+                    ("test-topic", 2): 0,
+                    ("test-topic", 3): 0,
+                },
+                [
+                    Path("test-topic-0"),
+                    Path("test-topic-0/00000000000000000000.log"),
+                    Path("test-topic-0/00000000000000000000.index"),
+                    Path("test-topic-1"),
+                    Path("test-topic-1/00000000000000000000.log"),
+                    Path("test-topic-1/00000000000000000000.index"),
+                    Path("test-topic-2"),
+                    Path("test-topic-2/00000000000000000000.log"),
+                    Path("test-topic-2/00000000000000000000.index"),
+                    Path("test-topic-3"),
+                    Path("test-topic-3/00000000000000000000.log"),
+                    Path("test-topic-3/00000000000000000000.index"),
+                ],
+            ),
         ),
         (
             ("test-topic", 2),
             "test-topic",
             2,
-            [
-                Path("test-topic-0"),
-                Path("test-topic-0/00000000000000000000.log"),
-                Path("test-topic-0/00000000000000000000.index"),
-                Path("test-topic-1"),
-                Path("test-topic-1/00000000000000000000.log"),
-                Path("test-topic-1/00000000000000000000.index"),
-                Path("test-topic-2"),
-                Path("test-topic-2/00000000000000000000.log"),
-                Path("test-topic-2/00000000000000000000.index"),
-                Path("test-topic-3"),
-                Path("test-topic-3/00000000000000000000.log"),
-                Path("test-topic-3/00000000000000000000.index"),
-            ],
+            (
+                {
+                    ("test-topic", 0): 0,
+                    ("test-topic", 1): 0,
+                    ("test-topic", 2): 0,
+                    ("test-topic", 3): 0,
+                },
+                [
+                    Path("test-topic-0"),
+                    Path("test-topic-0/00000000000000000000.log"),
+                    Path("test-topic-0/00000000000000000000.index"),
+                    Path("test-topic-1"),
+                    Path("test-topic-1/00000000000000000000.log"),
+                    Path("test-topic-1/00000000000000000000.index"),
+                    Path("test-topic-2"),
+                    Path("test-topic-2/00000000000000000000.log"),
+                    Path("test-topic-2/00000000000000000000.index"),
+                    Path("test-topic-3"),
+                    Path("test-topic-3/00000000000000000000.log"),
+                    Path("test-topic-3/00000000000000000000.index"),
+                ],
+            ),
         ),
         (
             ("test-topic", 1),
             "another-topic",
             3,
-            [
-                Path("test-topic-0"),
-                Path("test-topic-0/00000000000000000000.log"),
-                Path("test-topic-0/00000000000000000000.index"),
-                Path("another-topic-0"),
-                Path("another-topic-0/00000000000000000000.log"),
-                Path("another-topic-0/00000000000000000000.index"),
-                Path("another-topic-1"),
-                Path("another-topic-1/00000000000000000000.log"),
-                Path("another-topic-1/00000000000000000000.index"),
-                Path("another-topic-2"),
-                Path("another-topic-2/00000000000000000000.log"),
-                Path("another-topic-2/00000000000000000000.index"),
-            ],
+            (
+                {
+                    ("test-topic", 0): 0,
+                    ("another-topic", 0): 0,
+                    ("another-topic", 1): 0,
+                    ("another-topic", 2): 0,
+                },
+                [
+                    Path("test-topic-0"),
+                    Path("test-topic-0/00000000000000000000.log"),
+                    Path("test-topic-0/00000000000000000000.index"),
+                    Path("another-topic-0"),
+                    Path("another-topic-0/00000000000000000000.log"),
+                    Path("another-topic-0/00000000000000000000.index"),
+                    Path("another-topic-1"),
+                    Path("another-topic-1/00000000000000000000.log"),
+                    Path("another-topic-1/00000000000000000000.index"),
+                    Path("another-topic-2"),
+                    Path("another-topic-2/00000000000000000000.log"),
+                    Path("another-topic-2/00000000000000000000.index"),
+                ],
+            ),
         ),
     ],
     indirect=["initiated_log_storage"],
@@ -182,13 +225,15 @@ def test_append_partitions(
     topic_name: str,
     num_partitions: int,
     tmp_path: Path,
-    expected: list[Path],
+    expected: tuple[dict[tuple[str, int], int], list[Path]],
 ):
     initiated_log_storage.append_partitions(
         topic_name=topic_name, num_partitions=num_partitions
     )
 
-    for filename in expected:
+    leo_map, paths = expected
+    assert initiated_log_storage.leo_map == leo_map
+    for filename in paths:
         file_path = tmp_path / filename
         assert file_path.exists()
 
@@ -202,12 +247,13 @@ def test_init_partition(fs_log_storage: FSLogStorage, tmp_path: Path):
 
     assert log_file_path.exists()
     assert index_file_path.exists()
+    assert fs_log_storage.leo_map == {("test-topic", 0): 0}
 
 
 @pytest.fixture
-def log_segment(base_log_segment: Segment, request: pytest.FixtureRequest) -> Segment:
+def log_record(base_log_record: Record, request: pytest.FixtureRequest) -> Record:
     topic_name, partition_num, value, key, timestamp, headers = request.param
-    return base_log_segment.model_copy(
+    return base_log_record.model_copy(
         update=dict(
             topic=topic_name,
             partition=partition_num,
@@ -215,18 +261,19 @@ def log_segment(base_log_segment: Segment, request: pytest.FixtureRequest) -> Se
             key=key,
             timestamp=timestamp,
             headers=headers,
-            offset=0,
+            offset=None,
         )
     )
 
 
 @pytest.mark.parametrize(
-    "initiated_log_storage, log_segment, expected",
+    "initiated_log_storage, log_record, expected",
     [
         (
             ("test-topic", 1),
             ("test-topic", 0, b"test-value", None, 1752735958, {}),
             (
+                {("test-topic", 0): 1},
                 b"0086"
                 b"{"
                 b'"value":"dGVzdC12YWx1ZQ==",'
@@ -234,13 +281,14 @@ def log_segment(base_log_segment: Segment, request: pytest.FixtureRequest) -> Se
                 b'"timestamp":1752735958,'
                 b'"headers":{},'
                 b'"offset":0'
-                b"}"
+                b"}",
             ),
         ),
         (
             ("another-topic", 1),
             ("another-topic", 0, b"another-value", None, 1752735959, {}),
             (
+                {("another-topic", 0): 1},
                 b"0090"
                 b"{"
                 b'"value":"YW5vdGhlci12YWx1ZQ==",'
@@ -248,13 +296,18 @@ def log_segment(base_log_segment: Segment, request: pytest.FixtureRequest) -> Se
                 b'"timestamp":1752735959,'
                 b'"headers":{},'
                 b'"offset":0'
-                b"}"
+                b"}",
             ),
         ),
         (
             ("test-topic", 3),
             ("test-topic", 1, b"additional-data", None, 1752735960, {}),
             (
+                {
+                    ("test-topic", 0): 0,
+                    ("test-topic", 1): 1,
+                    ("test-topic", 2): 0,
+                },
                 b"0090"
                 b"{"
                 b'"value":"YWRkaXRpb25hbC1kYXRh",'
@@ -262,43 +315,148 @@ def log_segment(base_log_segment: Segment, request: pytest.FixtureRequest) -> Se
                 b'"timestamp":1752735960,'
                 b'"headers":{},'
                 b'"offset":0'
-                b"}"
+                b"}",
             ),
         ),
     ],
-    indirect=["initiated_log_storage", "log_segment"],
+    indirect=["initiated_log_storage", "log_record"],
 )
 def test_append_log(
     initiated_log_storage: FSLogStorage,
-    log_segment: Segment,
+    log_record: Record,
     tmp_path: Path,
-    expected: bytes,
+    expected: tuple[dict[tuple[str, int], int], bytes],
 ):
-    initiated_log_storage.append_log(log_segment)
+    initiated_log_storage.append_log(log_record)
 
+    leo_map, record = expected
+    assert initiated_log_storage.leo_map == leo_map
     log_file_path = (
         tmp_path
-        / log_segment.partition_dirname
+        / log_record.partition_dirname
         / f"{0:0{constants.LOG_FILENAME_LENGTH}d}.log"
     )
     with open(log_file_path, "rb") as log_file:
-        assert log_file.read() == expected
+        assert log_file.read() == record
 
 
 @pytest.mark.parametrize(
-    "initiated_log_storage, log_segment",
+    "initiated_log_storage, log_record",
     [
         (
             ("test-topic", 1),
             ("test-topic", 1, b"test-value", None, 1752735960, {}),
         ),
     ],
-    indirect=["initiated_log_storage", "log_segment"],
+    indirect=["initiated_log_storage", "log_record"],
 )
 def test_append_log_without_initiated_partition(
-    initiated_log_storage: FSLogStorage, log_segment: Segment, tmp_path: Path
+    initiated_log_storage: FSLogStorage, log_record: Record, tmp_path: Path
 ):
     with pytest.raises(
         PartitionNotFoundError, match="Partition test-topic-1 does not exist"
     ):
-        initiated_log_storage.append_log(log_segment)
+        initiated_log_storage.append_log(log_record)
+
+
+@pytest.fixture
+def logged_log_storage(
+    resource_dir: Path, tmp_path: Path, request: pytest.FixtureRequest
+) -> FSLogStorage:
+    root_dirname, log_file_size_limit = request.param
+    root_path = resource_dir / "roots" / root_dirname
+    shutil.copytree(root_path, tmp_path, dirs_exist_ok=True)
+    return FSLogStorage.load_from_root(
+        root_path=tmp_path, log_file_size_limit=log_file_size_limit
+    )
+
+
+@pytest.mark.parametrize(
+    "logged_log_storage, log_record, expected",
+    [
+        (
+            ("root-limit_1GB", 1024**3),
+            ("topic01", 0, b"second-log", None, 1752735962, {}),
+            (
+                {
+                    ("topic01", 0): 2,
+                    ("topic01", 1): 0,
+                },
+                [
+                    (
+                        0,
+                        b"0086"
+                        b"{"
+                        b'"value":"aW5pdGlhbC1sb2c=",'
+                        b'"key":null,'
+                        b'"timestamp":1752735961,'
+                        b'"headers":{},'
+                        b'"offset":0'
+                        b"}"
+                        b"0086"
+                        b"{"
+                        b'"value":"c2Vjb25kLWxvZw==",'
+                        b'"key":null,'
+                        b'"timestamp":1752735962,'
+                        b'"headers":{},'
+                        b'"offset":1'
+                        b"}",
+                    ),
+                ],
+            ),
+        ),
+        (
+            ("root-limit_100B", 100),
+            ("topic01", 0, b"second-log", None, 1752735962, {}),
+            (
+                {
+                    ("topic01", 0): 2,
+                    ("topic01", 1): 0,
+                },
+                [
+                    (
+                        0,
+                        b"0086"
+                        b"{"
+                        b'"value":"aW5pdGlhbC1sb2c=",'
+                        b'"key":null,'
+                        b'"timestamp":1752735961,'
+                        b'"headers":{},'
+                        b'"offset":0'
+                        b"}",
+                    ),
+                    (
+                        1,
+                        b"0086"
+                        b"{"
+                        b'"value":"c2Vjb25kLWxvZw==",'
+                        b'"key":null,'
+                        b'"timestamp":1752735962,'
+                        b'"headers":{},'
+                        b'"offset":1'
+                        b"}",
+                    ),
+                ],
+            ),
+        ),
+    ],
+    indirect=["logged_log_storage", "log_record"],
+)
+def test_append_log_to_already_logged_partition(
+    logged_log_storage: FSLogStorage,
+    log_record: Record,
+    tmp_path: Path,
+    expected: tuple[dict[tuple[str, int], int], list[tuple[int, bytes]]],
+):
+    logged_log_storage.append_log(log_record)
+
+    leo_map, segment = expected
+    assert logged_log_storage.leo_map == leo_map
+    for segment_id, expected_log in segment:
+        log_file_path = (
+            tmp_path
+            / log_record.partition_dirname
+            / f"{segment_id:0{constants.LOG_FILENAME_LENGTH}d}.log"
+        )
+        with open(log_file_path, "rb") as log_file:
+            assert log_file.read() == expected_log
