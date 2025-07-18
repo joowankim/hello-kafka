@@ -91,8 +91,8 @@ class FSLogStorage:
         )
         new_record = record.record_at(self.leo_map[(record.topic, record.partition)])
         new_record_binary = new_record.bin
-        new_log_file_size = log_path.stat().st_size + len(new_record_binary)
-        if new_log_file_size > self.log_file_size_limit:
+        current_log_file_size = log_path.stat().st_size + len(new_record_binary)
+        if current_log_file_size > self.log_file_size_limit:
             segment_id += 1
             log_path = (
                 partition_path / f"{segment_id:0{constants.LOG_FILENAME_LENGTH}d}.log"
@@ -106,7 +106,8 @@ class FSLogStorage:
             log_file.write(new_record_binary)
         with index_path.open("ab") as index_file:
             index_file.write(
-                f"{new_record.offset:0{constants.LOG_RECORD_OFFSET_WIDTH}d}{new_log_file_size:0{constants.LOG_RECORD_POSITION_WIDTH}d}".encode(
+                f"{new_record.offset:0{constants.LOG_RECORD_OFFSET_WIDTH}d}"
+                f"{current_log_file_size:0{constants.LOG_RECORD_POSITION_WIDTH}d}".encode(
                     "utf-8"
                 )
             )
