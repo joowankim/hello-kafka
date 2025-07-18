@@ -99,9 +99,9 @@ def recorded(base_log_record: Record, request: pytest.FixtureRequest) -> Record:
     indirect=["log_record", "recorded"],
 )
 def test_record_at(log_record: Record, offset: int, recorded: Record):
-    recorded = log_record.record_at(offset)
+    result = log_record.record_at(offset)
 
-    assert recorded == recorded
+    assert result == recorded
 
 
 @pytest.mark.parametrize(
