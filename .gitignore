@@ -147,12 +147,6 @@ cover/
 *.mo
 *.pot
 
-# Django stuff:
-*.log
-local_settings.py
-db.sqlite3
-db.sqlite3-journal
-
 # Flask stuff:
 instance/
 .webassets-cache
@@ -307,3 +301,8 @@ node_modules/
 # Task files - store tasks in git but ignore sensitive config
 .taskmaster
 .env.example
+
+tmp
+
+!tests/resource/
+!tests/resource/*.log
