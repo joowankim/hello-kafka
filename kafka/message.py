@@ -28,17 +28,16 @@ class Message(BaseModel):
         rf"^(?P<correlation_id>\d{{{constants.CORRELATION_ID_WIDTH}}})"
         rf"(?P<api_key>\d{{{constants.API_KEY_WIDTH}}})"
         rf"(?P<payload_length>\d{{{constants.PAYLOAD_LENGTH_WIDTH}}})"
-        r"(?P<payload>.*)$"
+        r"(?P<payload>{.*})$"
     )
 
     @property
     def serialized(self) -> bytes:
         return (
-            (f"{self.headers.correlation_id:0{constants.CORRELATION_ID_WIDTH}d}"
+            f"{self.headers.correlation_id:0{constants.CORRELATION_ID_WIDTH}d}"
             f"{self.headers.api_key:0{constants.API_KEY_WIDTH}d}"
-            f"{len(self.payload):0{constants.PAYLOAD_LENGTH_WIDTH}d}").encode("utf-8")
-            + self.payload
-        )
+            f"{len(self.payload):0{constants.PAYLOAD_LENGTH_WIDTH}d}"
+        ).encode("utf-8") + self.payload
 
     @classmethod
     def deserialize(cls, serialized: bytes) -> Self:

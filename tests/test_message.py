@@ -75,9 +75,15 @@ def test_deserialize(serialized: bytes, message: Message):
 @pytest.mark.parametrize(
     "serialized, error_message",
     [
-        (b"00010038{'topic': 'topic-1', 'value': 'value'}", "Invalid serialized message format"),
-        (b"00010038{'topic': 'topic-1', 'value': 12345}", "Invalid serialized message format"),
-        (b"0001000038", "Payload length does not match"),
+        (
+            b"00010038{'topic': 'topic-1', 'value': 'value'}",
+            "Invalid serialized message format",
+        ),
+        (
+            b"00010038{'topic': 'topic-1', 'value': 12345}",
+            "Invalid serialized message format",
+        ),
+        (b"0001000038{}", "Payload length does not match"),
     ],
 )
 def test_deserialize_invalid_bytes(serialized: bytes, error_message: str):
