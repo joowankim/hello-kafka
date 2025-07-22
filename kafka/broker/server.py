@@ -2,7 +2,7 @@ import asyncio
 from pathlib import Path
 
 from kafka import constants
-from kafka.broker import command, storage, parser
+from kafka.broker import storage, parser, handler
 
 
 async def handle_client(
@@ -12,14 +12,11 @@ async def handle_client(
         Path("tmp"), constants.LOG_FILE_SIZE_LIMIT
     )
     message_parser = parser.MessageParser(reader)
+    request_handler = handler.RequestHandler(log_storage)
     try:
         async for msg in message_parser:
-            req = command.CreateTopics.from_message(msg)
-            for topic in req.topics:
-                log_storage.init_topic(
-                    topic_name=topic.name, num_partitions=topic.num_partitions
-                )
-            writer.write(msg.payload)
+            resp = request_handler.handle(msg)
+            writer.write(resp.serialized)
             await writer.drain()
     except asyncio.CancelledError:
         pass
