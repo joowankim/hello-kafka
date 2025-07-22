@@ -1,22 +1,22 @@
 import asyncio
+from pathlib import Path
 
 from kafka import constants
+from kafka.broker import storage, parser, handler
 
 
 async def handle_client(
     reader: asyncio.StreamReader, writer: asyncio.StreamWriter
 ) -> None:
+    log_storage = storage.FSLogStorage.load_from_root(
+        Path("tmp"), constants.LOG_FILE_SIZE_LIMIT
+    )
+    message_parser = parser.MessageParser(reader)
+    request_handler = handler.RequestHandler(log_storage)
     try:
-        while True:
-            header_data = await reader.read(constants.HEADER_WIDTH)
-            if not header_data:
-                break
-            header = header_data.decode()
-            print(f"Header: {header}")
-            payload_data = await reader.read(
-                int(header[: -constants.PAYLOAD_LENGTH_WIDTH])
-            )
-            writer.write(payload_data)
+        async for msg in message_parser:
+            resp = request_handler.handle(msg)
+            writer.write(resp.serialized)
             await writer.drain()
     except asyncio.CancelledError:
         pass
