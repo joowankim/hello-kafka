@@ -16,25 +16,25 @@ class NonRetriableError(KafkaError):
     pass
 
 
-class SerializationError(KafkaError):
+class SerializationError(NonRetriableError):
     """직렬화 또는 역직렬화 중 발생하는 예외"""
 
     pass
 
 
-class InvalidAdminCommandError(KafkaError):
+class InvalidAdminCommandError(NonRetriableError):
     """잘못된 관리자 명령어에 대한 예외"""
 
     pass
 
 
-class PartitionNotFoundError(KafkaError):
+class PartitionNotFoundError(NonRetriableError):
     """파티션을 찾을 수 없는 경우 발생하는 예외"""
 
     pass
 
 
-class InvalidOffsetError(KafkaError):
+class InvalidOffsetError(NonRetriableError):
     """잘못된 오프셋에 대한 예외"""
 
     pass
