@@ -1,6 +1,6 @@
 import pytest
 
-from kafka.broker.request import CreateTopics, CreateTopic
+from kafka.broker.command import CreateTopics, CreateTopic
 
 
 @pytest.fixture

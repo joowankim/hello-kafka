@@ -2,7 +2,7 @@ import asyncio
 from pathlib import Path
 
 from kafka import constants, message
-from kafka.broker import request, storage
+from kafka.broker import command, storage
 
 
 async def handle_client(
@@ -22,7 +22,7 @@ async def handle_client(
                 int(header[: -constants.PAYLOAD_LENGTH_WIDTH])
             )
             msg = message.Message.deserialize(header_data + payload_data)
-            req = request.CreateTopics.from_message(msg)
+            req = command.CreateTopics.from_message(msg)
             for topic in req.topics:
                 log_storage.init_topic(
                     topic_name=topic.name, num_partitions=topic.num_partitions

@@ -4,7 +4,7 @@ from typing import Any
 import pydantic
 import pytest
 
-from kafka.broker.request import CreateTopics, CreateTopic
+from kafka.broker.command import CreateTopics, CreateTopic
 from kafka.message import Message, MessageHeaders
 
 
