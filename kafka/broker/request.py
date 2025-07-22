@@ -25,4 +25,4 @@ class CreateTopics(pydantic.BaseModel):
     def from_message(cls, msg: message.Message) -> Self:
         if msg.headers.api_key != message.MessageType.CREATE_TOPICS:
             raise ValueError("Message is not of type CREATE_TOPICS")
-        return cls.model_validate_json(msg.payload)
+        return cls.model_validate_json(msg.payload.decode("utf-8"))
