@@ -8,7 +8,7 @@ from kafka import message
 
 class CreateTopic(pydantic.BaseModel):
     name: str
-    num_partitions: int
+    num_partitions: int = Field(ge=1)
 
 
 class CreateTopics(pydantic.BaseModel):

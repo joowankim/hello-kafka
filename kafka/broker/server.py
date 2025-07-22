@@ -1,6 +1,7 @@
 import asyncio
 
-from kafka import constants
+from kafka import constants, message
+from kafka.broker import request
 
 
 async def handle_client(
@@ -16,6 +17,8 @@ async def handle_client(
             payload_data = await reader.read(
                 int(header[: -constants.PAYLOAD_LENGTH_WIDTH])
             )
+            msg = message.Message.deserialize(header_data + payload_data)
+            request_payload = request.CreateTopics.from_message(msg)  # noqa: F841
             writer.write(payload_data)
             await writer.drain()
     except asyncio.CancelledError:
