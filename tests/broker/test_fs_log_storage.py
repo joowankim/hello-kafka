@@ -25,7 +25,7 @@ def root_path(
     [
         ("root-empty", {}),
         ("root-limit_1GB", {("topic01", 0): 1, ("topic01", 1): 0}),
-        ("root-limit_100B", {("topic01", 0): 1, ("topic01", 1): 0}),
+        ("root-limit_100B", {("topic01", 0): 2, ("topic01", 1): 0}),
     ],
     indirect=["root_path"],
 )
@@ -386,7 +386,7 @@ def logged_log_storage(
                 },
                 [
                     (
-                        0,
+                        "topic01-0",
                         b"0086"
                         b"{"
                         b'"value":"aW5pdGlhbC1sb2c=",'
@@ -409,15 +409,15 @@ def logged_log_storage(
         ),
         (
             ("root-limit_100B", 100),
-            ("topic01", 0, "c2Vjb25kLWxvZw==", None, 1752735962, {}),
+            ("topic01", 1, "c2Vjb25kLWxvZw==", None, 1752735962, {}),
             (
                 {
                     ("topic01", 0): 2,
-                    ("topic01", 1): 0,
+                    ("topic01", 1): 1,
                 },
                 [
                     (
-                        0,
+                        "topic01-0",
                         b"0086"
                         b"{"
                         b'"value":"aW5pdGlhbC1sb2c=",'
@@ -425,17 +425,25 @@ def logged_log_storage(
                         b'"timestamp":1752735961,'
                         b'"headers":{},'
                         b'"offset":0'
+                        b"}"
+                        b"0086"
+                        b"{"
+                        b'"value":"aW5pdGlhbC1sb2c=",'
+                        b'"key":null,'
+                        b'"timestamp":1752735961,'
+                        b'"headers":{},'
+                        b'"offset":1'
                         b"}",
                     ),
                     (
-                        1,
+                        "topic01-1",
                         b"0086"
                         b"{"
                         b'"value":"c2Vjb25kLWxvZw==",'
                         b'"key":null,'
                         b'"timestamp":1752735962,'
                         b'"headers":{},'
-                        b'"offset":1'
+                        b'"offset":0'
                         b"}",
                     ),
                 ],
@@ -448,17 +456,15 @@ def test_append_log_to_already_logged_partition(
     logged_log_storage: FSLogStorage,
     log_record: Record,
     tmp_path: Path,
-    expected: tuple[dict[tuple[str, int], int], list[tuple[int, bytes]]],
+    expected: tuple[dict[tuple[str, int], int], list[tuple[str, bytes]]],
 ):
     logged_log_storage.append_log(log_record)
 
     leo_map, segment = expected
     assert logged_log_storage.leo_map == leo_map
-    for segment_id, expected_log in segment:
+    for partition_dirname, expected_log in segment:
         log_file_path = (
-            tmp_path
-            / log_record.partition_dirname
-            / f"{segment_id:0{constants.LOG_FILENAME_LENGTH}d}.log"
+            tmp_path / partition_dirname / f"{0:0{constants.LOG_FILENAME_LENGTH}d}.log"
         )
         with open(log_file_path, "rb") as log_file:
             assert log_file.read() == expected_log
