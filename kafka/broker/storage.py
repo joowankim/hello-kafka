@@ -37,8 +37,8 @@ class FSLogStorage:
                 records = []
                 while payload_size_str := log_file.read(constants.PAYLOAD_LENGTH_WIDTH):
                     payload_size = int(payload_size_str)
-                    record = log_file.read(payload_size).decode("utf-8")
-                    records.append(record)
+                    payload_data = log_file.read(payload_size).decode("utf-8")
+                    records.append(payload_data)
                 log_end_offset = log_end_segment_id + len(records)
             leo_map[(topic_name, int(partition_num))] = log_end_offset
         return cls(
