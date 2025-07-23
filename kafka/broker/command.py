@@ -1,4 +1,3 @@
-import base64
 import json
 import time
 from typing import Self
@@ -32,10 +31,10 @@ class CreateTopics(pydantic.BaseModel):
 
 
 class RecordContents(pydantic.BaseModel):
-    value: bytes
-    key: bytes | None
+    value: str
+    key: str | None
     timestamp: int | None
-    headers: dict[str, bytes]
+    headers: dict[str, str]
 
 
 class Produce(pydantic.BaseModel):
@@ -51,11 +50,6 @@ class Produce(pydantic.BaseModel):
         if params.get("records") is None:
             raise ValueError("Produce command must have a 'records' field")
         for idx, record in enumerate(params["records"]):
-            if (value := record.get("value")) is None:
-                raise ValueError("Produce command must have a 'value' field")
-            record["value"] = base64.b64decode(value)
-            if (key := record.get("key")) is not None:
-                record["key"] = base64.b64decode(key)
             if record.get("timestamp") is None:
                 record["timestamp"] = time.time()
             params["records"][idx] = record

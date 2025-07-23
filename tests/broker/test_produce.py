@@ -55,7 +55,7 @@ def expected(
                 partition=0,
                 records=[
                     dict(
-                        value=b"value",
+                        value="dmFsdWU=",
                         key=None,
                         timestamp=1753230940,
                         headers={},
@@ -73,10 +73,28 @@ def expected(
                 partition=1,
                 records=[
                     dict(
-                        value=b"value2",
-                        key=b"user01",
+                        value="dmFsdWUy",
+                        key="dXNlcjAx",
                         timestamp=1753230940,
                         headers={},
+                    ),
+                ],
+            ),
+        ),
+        (
+            (
+                {"correlation_id": 2, "api_key": MessageType.PRODUCE},
+                b'{"topic": "topic02","partition":1,"records":[{"value":"dmFsdWUy","key":"dXNlcjAx","timestamp":null,"headers":{"header1":"dmFsdWUx"}}]}',
+            ),
+            dict(
+                topic="topic02",
+                partition=1,
+                records=[
+                    dict(
+                        value="dmFsdWUy",
+                        key="dXNlcjAx",
+                        timestamp=1753230940,
+                        headers={"header1": "dmFsdWUx"},
                     ),
                 ],
             ),
