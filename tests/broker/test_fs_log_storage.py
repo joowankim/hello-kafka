@@ -272,7 +272,7 @@ def log_record(base_log_record: Record, request: pytest.FixtureRequest) -> Recor
     [
         (
             ("test-topic", 1),
-            ("test-topic", 0, b"test-value", None, 1752735958, {}),
+            ("test-topic", 0, "dGVzdC12YWx1ZQ==", None, 1752735958, {}),
             (
                 {("test-topic", 0): 1},
                 b"0086"
@@ -287,7 +287,7 @@ def log_record(base_log_record: Record, request: pytest.FixtureRequest) -> Recor
         ),
         (
             ("another-topic", 1),
-            ("another-topic", 0, b"another-value", None, 1752735959, {}),
+            ("another-topic", 0, "YW5vdGhlci12YWx1ZQ==", None, 1752735959, {}),
             (
                 {("another-topic", 0): 1},
                 b"0090"
@@ -302,7 +302,7 @@ def log_record(base_log_record: Record, request: pytest.FixtureRequest) -> Recor
         ),
         (
             ("test-topic", 3),
-            ("test-topic", 1, b"additional-data", None, 1752735960, {}),
+            ("test-topic", 1, "YWRkaXRpb25hbC1kYXRh", None, 1752735960, {}),
             (
                 {
                     ("test-topic", 0): 0,
@@ -346,7 +346,7 @@ def test_append_log(
     [
         (
             ("test-topic", 1),
-            ("test-topic", 1, b"test-value", None, 1752735960, {}),
+            ("test-topic", 1, "dGVzdC12YWx1ZQ==", None, 1752735960, {}),
         ),
     ],
     indirect=["initiated_log_storage", "log_record"],
@@ -378,7 +378,7 @@ def logged_log_storage(
     [
         (
             ("root-limit_1GB", 1024**3),
-            ("topic01", 0, b"second-log", None, 1752735962, {}),
+            ("topic01", 0, "c2Vjb25kLWxvZw==", None, 1752735962, {}),
             (
                 {
                     ("topic01", 0): 2,
@@ -409,7 +409,7 @@ def logged_log_storage(
         ),
         (
             ("root-limit_100B", 100),
-            ("topic01", 0, b"second-log", None, 1752735962, {}),
+            ("topic01", 0, "c2Vjb25kLWxvZw==", None, 1752735962, {}),
             (
                 {
                     ("topic01", 0): 2,
