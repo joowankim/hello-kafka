@@ -11,6 +11,10 @@ class Fetch(pydantic.BaseModel):
     offset: int
     max_bytes: int
 
+    @property
+    def partition_dirname(self) -> str:
+        return f"{self.topic}-{self.partition}"
+
     @classmethod
     def from_message(cls, msg: message.Message) -> Self:
         if msg.headers.api_key != message.MessageType.FETCH:

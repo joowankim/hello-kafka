@@ -5,6 +5,7 @@ import pytest
 
 from kafka import constants
 from kafka.broker.log import Record
+from kafka.broker.query import Fetch
 from kafka.broker.storage import FSLogStorage
 from kafka.error import InvalidAdminCommandError, PartitionNotFoundError
 
@@ -425,14 +426,6 @@ def logged_log_storage(
                         b'"timestamp":1752735961,'
                         b'"headers":{},'
                         b'"offset":0'
-                        b"}"
-                        b"0086"
-                        b"{"
-                        b'"value":"aW5pdGlhbC1sb2c=",'
-                        b'"key":null,'
-                        b'"timestamp":1752735961,'
-                        b'"headers":{},'
-                        b'"offset":1'
                         b"}",
                     ),
                     (
@@ -468,3 +461,76 @@ def test_append_log_to_already_logged_partition(
         )
         with open(log_file_path, "rb") as log_file:
             assert log_file.read() == expected_log
+
+
+@pytest.mark.parametrize(
+    "logged_log_storage, qry, expected",
+    [
+        (
+            ("root-limit_1GB", 1024**3),
+            Fetch(topic="topic01", partition=0, offset=0, max_bytes=100),
+            [
+                Record(
+                    topic="topic01",
+                    partition=0,
+                    value="aW5pdGlhbC1sb2c=",
+                    key=None,
+                    timestamp=1752735961,
+                    headers={},
+                    offset=0,
+                ),
+            ],
+        ),
+        (
+            ("root-limit_1GB", 1024**3),
+            Fetch(topic="topic01", partition=0, offset=1, max_bytes=100),
+            [],
+        ),
+        (
+            ("root-limit_100B", 100),
+            Fetch(topic="topic01", partition=0, offset=0, max_bytes=100),
+            [
+                Record(
+                    topic="topic01",
+                    partition=0,
+                    value="aW5pdGlhbC1sb2c=",
+                    key=None,
+                    timestamp=1752735961,
+                    headers={},
+                    offset=0,
+                ),
+            ],
+        ),
+        (
+            ("root-limit_100B", 100),
+            Fetch(topic="topic01", partition=0, offset=0, max_bytes=10000),
+            [
+                Record(
+                    topic="topic01",
+                    partition=0,
+                    value="aW5pdGlhbC1sb2c=",
+                    key=None,
+                    timestamp=1752735961,
+                    headers={},
+                    offset=0,
+                ),
+                Record(
+                    topic="topic01",
+                    partition=0,
+                    value="aW5pdGlhbC1sb2c=",
+                    key=None,
+                    timestamp=1752735961,
+                    headers={},
+                    offset=1,
+                ),
+            ],
+        ),
+    ],
+    indirect=["logged_log_storage"],
+)
+def test_list_logs(
+    logged_log_storage: FSLogStorage, qry: Fetch, expected: list[Record]
+):
+    records = logged_log_storage.list_logs(qry)
+
+    assert records == expected

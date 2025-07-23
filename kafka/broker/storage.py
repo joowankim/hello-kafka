@@ -1,9 +1,10 @@
+import json
 import re
 from pathlib import Path
 from typing import Self, ClassVar
 
 from kafka import constants
-from kafka.broker import log
+from kafka.broker import log, query
 from kafka.error import InvalidAdminCommandError, PartitionNotFoundError
 
 
@@ -114,3 +115,92 @@ class FSLogStorage:
                 )
             )
         self.leo_map[(record.topic, record.partition)] += 1
+
+    def list_segments(self, topic_name: str, partition_num: int) -> list[int]:
+        partition_path = self.root_path / f"{topic_name}-{partition_num}"
+        if not partition_path.exists():
+            raise PartitionNotFoundError(
+                f"Partition {topic_name}-{partition_num} does not exist"
+            )
+        return [int(p.stem) for p in partition_path.glob("*.log")]
+
+    def list_logs(self, qry: query.Fetch) -> list[log.Record]:
+        segments = self.list_segments(topic_name=qry.topic, partition_num=qry.partition)
+        nearest_segment = max(s for s in segments if s <= qry.offset)
+        index_path = (
+            self.root_path
+            / qry.partition_dirname
+            / f"{nearest_segment:0{constants.LOG_FILENAME_LENGTH}d}.index"
+        )
+        with index_path.open("rb") as index_file:
+            while True:
+                index_entry = index_file.read(
+                    constants.LOG_RECORD_OFFSET_WIDTH
+                    + constants.LOG_RECORD_POSITION_WIDTH
+                )
+                if not index_entry:
+                    break
+                offset, pos = (
+                    index_entry[: constants.LOG_RECORD_OFFSET_WIDTH],
+                    index_entry[constants.LOG_RECORD_OFFSET_WIDTH :],
+                )
+                if offset == qry.offset:
+                    break
+        if int(offset) != qry.offset:
+            return []
+        log_path = (
+            self.root_path
+            / qry.partition_dirname
+            / f"{nearest_segment:0{constants.LOG_FILENAME_LENGTH}d}.log"
+        )
+        result = []
+        total_record_size = 0
+        with log_path.open("rb") as log_file:
+            log_file.seek(int(pos))
+            while True:
+                record_size_str = log_file.read(constants.PAYLOAD_LENGTH_WIDTH)
+                if not record_size_str:
+                    break
+                record_size = int(record_size_str)
+                record_data = json.loads(log_file.read(record_size).decode("utf-8"))
+                record = log.Record.model_validate(
+                    record_data
+                    | {
+                        "topic": qry.topic,
+                        "partition": qry.partition,
+                    }
+                )
+                total_record_size += record.size
+                if total_record_size > qry.max_bytes:
+                    break
+                result.append(record)
+        if total_record_size < qry.max_bytes:
+            after_segments = [s for s in segments if s > nearest_segment]
+            for segment in after_segments:
+                log_path = (
+                    self.root_path
+                    / qry.partition_dirname
+                    / f"{segment:0{constants.LOG_FILENAME_LENGTH}d}.log"
+                )
+                with log_path.open("rb") as log_file:
+                    while True:
+                        record_size_str = log_file.read(constants.PAYLOAD_LENGTH_WIDTH)
+                        if not record_size_str:
+                            break
+                        record_size = int(record_size_str)
+                        record_data = json.loads(
+                            log_file.read(record_size).decode("utf-8")
+                        )
+                        record = log.Record.model_validate(
+                            record_data
+                            | {
+                                "topic": qry.topic,
+                                "partition": qry.partition,
+                            }
+                        )
+                        total_record_size += record.size
+                        if total_record_size > qry.max_bytes:
+                            break
+                        result.append(record)
+
+        return result

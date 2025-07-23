@@ -30,6 +30,10 @@ class Record(BaseModel):
         data = self.model_dump_json(exclude={"topic", "partition"})
         return f"{len(data):0{constants.PAYLOAD_LENGTH_WIDTH}d}{data}".encode("utf-8")
 
+    @property
+    def size(self) -> int:
+        return len(self.bin[constants.PAYLOAD_LENGTH_WIDTH :])
+
     @classmethod
     def from_produce_command(cls, cmd: command.Produce) -> list[Self]:
         return [
