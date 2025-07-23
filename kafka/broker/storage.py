@@ -9,7 +9,7 @@ from kafka.error import InvalidAdminCommandError, PartitionNotFoundError
 
 class FSLogStorage:
     record_pattern: ClassVar[re.Pattern] = re.compile(
-        r"(?P<size>\d{4})(?P<payload>{.*})"
+        r"(?P<size>\d{4})(?P<payload>{.*?})"
     )
 
     def __init__(
@@ -34,9 +34,11 @@ class FSLogStorage:
                 partition_path
                 / f"{log_end_segment_id:0{constants.LOG_FILENAME_LENGTH}d}.log"
             ).open("rb") as log_file:
-                logs = log_file.read()
-                decoded = logs.decode("utf-8")
-                records = list(cls.record_pattern.finditer(decoded))
+                records = []
+                while payload_size_str := log_file.read(constants.PAYLOAD_LENGTH_WIDTH):
+                    payload_size = int(payload_size_str)
+                    payload_data = log_file.read(payload_size).decode("utf-8")
+                    records.append(payload_data)
                 log_end_offset = log_end_segment_id + len(records)
             leo_map[(topic_name, int(partition_num))] = log_end_offset
         return cls(
