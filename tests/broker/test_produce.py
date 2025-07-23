@@ -4,7 +4,7 @@ from unittest import mock
 import pydantic
 import pytest
 
-from kafka.broker.command import Produce
+from kafka.broker.command import Produce, RecordContents
 from kafka.message import MessageHeaders, Message, MessageType
 
 
@@ -24,9 +24,22 @@ def message(
 
 
 @pytest.fixture
-def expected(base_produce: Produce, request: pytest.FixtureRequest) -> Produce:
+def expected(
+    base_record_contents: RecordContents,
+    base_produce: Produce,
+    request: pytest.FixtureRequest,
+) -> Produce:
     record_params: dict[str, Any] = request.param
-    return base_produce.model_copy(update=record_params)
+    return base_produce.model_copy(
+        update=dict(
+            topic=record_params["topic"],
+            partition=record_params["partition"],
+            records=[
+                base_record_contents.model_copy(update=record)
+                for record in record_params["records"]
+            ],
+        )
+    )
 
 
 @pytest.mark.parametrize(
@@ -35,29 +48,37 @@ def expected(base_produce: Produce, request: pytest.FixtureRequest) -> Produce:
         (
             (
                 {"correlation_id": 1, "api_key": MessageType.PRODUCE},
-                b'{"topic":"topic01","value":"dmFsdWU=","partition":0,"key":null,"timestamp":null,"headers":{}}',
+                b'{"topic":"topic01","partition":0,"records":[{"value":"dmFsdWU=","key":null,"timestamp":null,"headers":{}}]}',
             ),
             dict(
                 topic="topic01",
-                value=b"value",
                 partition=0,
-                key=None,
-                timestamp=1753230940,
-                headers={},
+                records=[
+                    dict(
+                        value=b"value",
+                        key=None,
+                        timestamp=1753230940,
+                        headers={},
+                    ),
+                ],
             ),
         ),
         (
             (
                 {"correlation_id": 2, "api_key": MessageType.PRODUCE},
-                b'{"topic": "topic02","value":"dmFsdWUy","key":"dXNlcjAx","partition":1,"timestamp":null,"headers":{}}',
+                b'{"topic": "topic02","partition":1,"records":[{"value":"dmFsdWUy","key":"dXNlcjAx","timestamp":null,"headers":{}}]}',
             ),
             dict(
                 topic="topic02",
-                value=b"value2",
                 partition=1,
-                key=b"user01",
-                timestamp=1753230940,
-                headers={},
+                records=[
+                    dict(
+                        value=b"value2",
+                        key=b"user01",
+                        timestamp=1753230940,
+                        headers={},
+                    ),
+                ],
             ),
         ),
     ],
@@ -76,7 +97,7 @@ def test_from_message(message: Message, expected: Produce):
         (
             (
                 {"correlation_id": 1, "api_key": MessageType.CREATE_TOPICS},
-                b'{"topic":"topic01","value":"dmFsdWU=","partition":0}',
+                b'{"topic":"topic01","partition":0,"records":[{"value":"dmFsdWU="}]}',
             ),
             ValueError,
         ),
@@ -90,7 +111,7 @@ def test_from_message(message: Message, expected: Produce):
         (
             (
                 {"correlation_id": 3, "api_key": MessageType.PRODUCE},
-                b'{"topic": "topic03", "value": "dmFsdWU=", "partition": 2}',
+                b'{"topic": "topic03", "partition": 2, "records": []}',
             ),
             pydantic.ValidationError,
         ),

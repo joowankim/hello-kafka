@@ -1,4 +1,5 @@
 import json
+from collections.abc import Callable
 
 from kafka import message
 from kafka.broker import command
@@ -11,6 +12,14 @@ class RequestHandler:
         self.log_storage = log_storage
 
     def handle(self, req: message.Message) -> message.Message:
+        handlers: dict[
+            message.MessageType, Callable[[message.Message], message.Message]
+        ] = {
+            message.MessageType.CREATE_TOPICS: self._handle_create_topics,
+        }
+        return handlers[req.headers.api_key](req)
+
+    def _handle_create_topics(self, req: message.Message) -> message.Message:
         cmd = command.CreateTopics.from_message(req)
         results = []
         for topic in cmd.topics:
@@ -47,3 +56,5 @@ class RequestHandler:
             headers=req.headers,
             payload=json.dumps({"topics": results}).encode("utf-8"),
         )
+
+    def _handle_produce(self, req: message.Message) -> message.Message: ...
