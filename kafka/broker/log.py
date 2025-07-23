@@ -1,20 +1,20 @@
-import base64
 from pathlib import Path
 from typing import Self
 
 from pydantic import BaseModel
 
 from kafka import constants
+from kafka.broker import command
 from kafka.error import InvalidOffsetError
 
 
 class Record(BaseModel):
     topic: str
     partition: int
-    value: bytes
-    key: bytes | None
+    value: str
+    key: str | None
     timestamp: int
-    headers: dict[str, bytes]
+    headers: dict[str, str]
     offset: int | None
 
     @property
@@ -27,19 +27,23 @@ class Record(BaseModel):
             raise InvalidOffsetError(
                 "Offset must be set before converting to binary format"
             )
-        encoded_value = base64.b64encode(self.value)
-        encoded_key = self.key and base64.b64encode(self.key)
-        encoded_headers = {k: base64.b64encode(v) for k, v in self.headers.items()}
-        encoded_self = self.model_copy(
-            deep=True,
-            update={
-                "value": encoded_value,
-                "key": encoded_key,
-                "headers": encoded_headers,
-            },
-        )
-        data = encoded_self.model_dump_json(exclude={"topic", "partition"})
+        data = self.model_dump_json(exclude={"topic", "partition"})
         return f"{len(data):0{constants.PAYLOAD_LENGTH_WIDTH}d}{data}".encode("utf-8")
+
+    @classmethod
+    def from_produce_command(cls, cmd: command.Produce) -> list[Self]:
+        return [
+            cls(
+                topic=cmd.topic,
+                partition=cmd.partition,
+                value=record.value,
+                key=record.key,
+                timestamp=record.timestamp,
+                headers=record.headers,
+                offset=None,
+            )
+            for record in cmd.records
+        ]
 
     def record_at(self, offset: int) -> Self:
         if self.offset is not None:

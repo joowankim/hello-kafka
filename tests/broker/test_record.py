@@ -3,6 +3,7 @@ from typing import Any
 
 import pytest
 
+from kafka.broker.command import Produce, RecordContents
 from kafka.broker.log import Record
 from kafka.error import InvalidOffsetError
 
@@ -42,7 +43,7 @@ def test_partition_dirname(log_record: Record, expected: Path):
     "log_record, expected",
     [
         (
-            ("test-topic", 0, b"test-value", None, 1752735958, {}, 0),
+            ("test-topic", 0, "dGVzdC12YWx1ZQ==", None, 1752735958, {}, 0),
             (
                 b"0086{"
                 b'"value":"dGVzdC12YWx1ZQ==",'
@@ -54,7 +55,7 @@ def test_partition_dirname(log_record: Record, expected: Path):
             ),
         ),
         (
-            ("another-topic", 1, b"another-value", None, 1752735959, {}, 3),
+            ("another-topic", 1, b"YW5vdGhlci12YWx1ZQ==", None, 1752735959, {}, 3),
             (
                 b"0090"
                 b"{"
@@ -83,12 +84,12 @@ def recorded(base_log_record: Record, request: pytest.FixtureRequest) -> Record:
     "log_record, offset, recorded",
     [
         (
-            ("test-topic", 0, b"test-value", None, 1752735958, {}, None),
+            ("test-topic", 0, "dGVzdC12YWx1ZQ==", None, 1752735958, {}, None),
             1,
             dict(
                 topic="test-topic",
                 partition=0,
-                value=b"test-value",
+                value="dGVzdC12YWx1ZQ==",
                 key=None,
                 timestamp=1752735958,
                 headers={},
@@ -107,8 +108,8 @@ def test_record_at(log_record: Record, offset: int, recorded: Record):
 @pytest.mark.parametrize(
     "log_record",
     [
-        ("test-topic", 0, b"test-value", None, 1752735958, {}, 0),
-        ("test-topic", 0, b"test-value", None, 1752735958, {}, 1),
+        ("test-topic", 0, "dGVzdC12YWx1ZQ==", None, 1752735958, {}, 0),
+        ("test-topic", 0, "dGVzdC12YWx1ZQ==", None, 1752735958, {}, 1),
     ],
     indirect=True,
 )
@@ -122,11 +123,92 @@ def test_record_at_with_already_recorded(log_record: Record):
 @pytest.mark.parametrize(
     "log_record",
     [
-        ("test-topic", 0, b"test-value", None, 1752735958, {}, None),
-        ("another-topic", 1, b"another-value", None, 1752735959, {}, None),
+        ("test-topic", 0, "dGVzdC12YWx1ZQ==", None, 1752735958, {}, None),
+        ("another-topic", 1, "YW5vdGhlci12YWx1ZQ==", None, 1752735959, {}, None),
     ],
     indirect=True,
 )
 def test_convert_to_binary_without_offset(log_record: Record):
     with pytest.raises(InvalidOffsetError):
         log_record.bin
+
+
+@pytest.fixture
+def produce_command(
+    base_record_contents: RecordContents,
+    base_produce: Produce,
+    request: pytest.FixtureRequest,
+) -> Produce:
+    topic, partition, records = request.param
+    return base_produce.model_copy(
+        update=dict(
+            topic=topic,
+            partition=partition,
+            records=[
+                base_record_contents.model_copy(update=record_params)
+                for record_params in records
+            ],
+        )
+    )
+
+
+@pytest.fixture
+def expected_records(
+    base_log_record: Record, request: pytest.FixtureRequest
+) -> list[Record]:
+    records: list[dict[str, Any]] = request.param
+    return [
+        base_log_record.model_copy(update=record_params) for record_params in records
+    ]
+
+
+@pytest.mark.parametrize(
+    "produce_command, expected_records",
+    [
+        (
+            (
+                "test-topic",
+                0,
+                [
+                    {
+                        "value": "aGVsbG8=",
+                        "key": None,
+                        "timestamp": 1752735958,
+                        "headers": {},
+                    },
+                    {
+                        "value": "aGVsbG8=",
+                        "key": None,
+                        "timestamp": 1752735958,
+                        "headers": {},
+                    },
+                ],
+            ),
+            [
+                dict(
+                    topic="test-topic",
+                    partition=0,
+                    value="aGVsbG8=",
+                    key=None,
+                    timestamp=1752735958,
+                    headers={},
+                    offset=None,
+                ),
+                dict(
+                    topic="test-topic",
+                    partition=0,
+                    value="aGVsbG8=",
+                    key=None,
+                    timestamp=1752735958,
+                    headers={},
+                    offset=None,
+                ),
+            ],
+        ),
+    ],
+    indirect=["produce_command", "expected_records"],
+)
+def test_from_produce_command(produce_command: Produce, expected_records: list[Record]):
+    records = Record.from_produce_command(produce_command)
+
+    assert records == expected_records
