@@ -1,4 +1,5 @@
 from typing import Any
+from unittest import mock
 
 import pydantic
 import pytest
@@ -41,7 +42,7 @@ def expected(base_produce: Produce, request: pytest.FixtureRequest) -> Produce:
                 value=b"value",
                 partition=0,
                 key=None,
-                timestamp=None,
+                timestamp=1753230940,
                 headers={},
             ),
         ),
@@ -55,7 +56,7 @@ def expected(base_produce: Produce, request: pytest.FixtureRequest) -> Produce:
                 value=b"value2",
                 partition=1,
                 key=b"user01",
-                timestamp=None,
+                timestamp=1753230940,
                 headers={},
             ),
         ),
@@ -63,9 +64,10 @@ def expected(base_produce: Produce, request: pytest.FixtureRequest) -> Produce:
     indirect=["message", "expected"],
 )
 def test_from_message(message: Message, expected: Produce):
-    cmd = Produce.from_message(message)
+    with mock.patch("time.time", return_value=1753230940):
+        cmd = Produce.from_message(message)
 
-    assert cmd == expected
+        assert cmd == expected
 
 
 @pytest.mark.parametrize(

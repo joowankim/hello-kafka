@@ -1,5 +1,6 @@
 import base64
 import json
+import time
 from typing import Self
 
 import pydantic
@@ -48,4 +49,6 @@ class Produce(pydantic.BaseModel):
         params["value"] = base64.b64decode(value)
         if (key := params.get("key")) is not None:
             params["key"] = base64.b64decode(key)
+        if params.get("timestamp") is None:
+            params["timestamp"] = time.time()
         return cls.model_validate(params)
