@@ -51,6 +51,6 @@ class Produce(pydantic.BaseModel):
             raise ValueError("Produce command must have a 'records' field")
         for idx, record in enumerate(params["records"]):
             if record.get("timestamp") is None:
-                record["timestamp"] = time.time()
+                record["timestamp"] = int(time.time())
             params["records"][idx] = record
         return cls.model_validate(params)
