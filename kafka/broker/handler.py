@@ -68,11 +68,11 @@ class RequestHandler:
         try:
             for record in records:
                 self.log_storage.append_log(record)
-                result |= {
-                    "topic": cmd.topic,
-                    "partition": cmd.partition,
-                    "error_code": 0,
-                }
+            result |= {
+                "topic": cmd.topic,
+                "partition": cmd.partition,
+                "error_code": 0,
+            }
         except PartitionNotFoundError as exc:
             result = {
                 "topic": cmd.topic,
