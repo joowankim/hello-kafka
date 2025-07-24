@@ -1,4 +1,5 @@
 from typing import Self
+import json
 
 import pydantic
 from pydantic import Field
@@ -48,6 +49,17 @@ class Record(pydantic.BaseModel):
             )
             for record in cmd.records
         ]
+
+    @classmethod
+    def from_log(cls, topic: str, partition: int, record_data: bytes) -> Self:
+        record_data = json.loads(record_data.decode("utf-8"))
+        return cls.model_validate(
+            record_data
+            | {
+                "topic": topic,
+                "partition": partition,
+            }
+        )
 
     def record_at(self, offset: int) -> Self:
         if self.offset is not None:
