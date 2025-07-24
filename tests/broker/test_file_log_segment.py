@@ -115,3 +115,48 @@ def test_append_and_read(
 def test_append_with_over_size_record(file_log_segment: FileLogSegment, record: Record):
     with pytest.raises(ExceedSegmentSizeError):
         file_log_segment.append(record)
+
+
+@pytest.mark.parametrize(
+    "file_log_segment, start_offset, max_bytes, expected",
+    [
+        (
+            ("root-limit_100B", "topic01-0", 0, 100),
+            1,
+            1024,
+            [],
+        ),
+        (
+            ("root-limit_100B", "topic01-0", 0, 100),
+            0,
+            50,
+            [],
+        ),
+        (
+            ("root-limit_100B", "topic01-0", 0, 100),
+            0,
+            100,
+            [
+                dict(
+                    topic="topic01",
+                    partition=0,
+                    value="aW5pdGlhbC1sb2c=",
+                    key=None,
+                    timestamp=1752735961,
+                    headers={},
+                    offset=0,
+                ),
+            ],
+        ),
+    ],
+    indirect=["file_log_segment", "expected"],
+)
+def test_read(
+    file_log_segment: FileLogSegment,
+    start_offset: int,
+    max_bytes: int,
+    expected: list[Record],
+):
+    records = file_log_segment.read(start_offset=start_offset, max_bytes=max_bytes)
+
+    assert records == expected
