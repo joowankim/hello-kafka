@@ -145,7 +145,6 @@ class QueryHandler:
                 "error_message": str(exc),
                 "records": [],
             }
-            raise exc
         return message.Message(
             headers=req.headers,
             payload=json.dumps(result).encode("utf-8"),
