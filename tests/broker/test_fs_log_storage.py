@@ -106,7 +106,7 @@ def fs_log_storage(tmp_path: Path) -> FSLogStorage:
     return FSLogStorage(
         root_path=root_path,
         log_file_size_limit=constants.LOG_FILE_SIZE_LIMIT,
-        leo_map={},
+        partitions={},
     )
 
 
@@ -310,7 +310,11 @@ def test_init_partition(fs_log_storage: FSLogStorage, tmp_path: Path):
 
     assert log_file_path.exists()
     assert index_file_path.exists()
-    assert fs_log_storage.leo_map == {("test-topic", 0): 0}
+    assert fs_log_storage.partitions == {
+        ("test-topic", 0): Partition(
+            topic="test-topic", num=0, segments=[Segment(base_offset=0)], leo=0
+        )
+    }
 
 
 @pytest.fixture

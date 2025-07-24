@@ -59,13 +59,17 @@ class FSLogStorage:
         partition_path = self.root_path / f"{topic_name}-{partition_num}"
         if not partition_path.exists():
             partition_path.mkdir(parents=True, exist_ok=True)
-        log_file_path = partition_path / f"{0:0{constants.LOG_FILENAME_LENGTH}d}.log"
+        new_segment = log.Segment(base_offset=0)
+        log_file_path = partition_path / new_segment.log
         log_file_path.touch()
-        index_file_path = (
-            partition_path / f"{0:0{constants.LOG_FILENAME_LENGTH}d}.index"
-        )
+        index_file_path = partition_path / new_segment.index
         index_file_path.touch()
-        self.leo_map[(topic_name, partition_num)] = 0
+        self.partitions[(topic_name, partition_num)] = log.Partition(
+            topic=topic_name,
+            num=partition_num,
+            segments=[new_segment],
+            leo=0,
+        )
 
     def init_topic(self, topic_name: str, num_partitions: int) -> None:
         if num_partitions <= 0:
