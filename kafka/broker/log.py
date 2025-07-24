@@ -1,14 +1,16 @@
+import abc
+import re
 from pathlib import Path
-from typing import Self
+from typing import Self, ClassVar
 
-from pydantic import BaseModel
+import pydantic
 
 from kafka import constants
 from kafka.broker import command
 from kafka.error import InvalidOffsetError
 
 
-class Record(BaseModel):
+class Record(pydantic.BaseModel):
     topic: str
     partition: int
     value: str
@@ -55,3 +57,33 @@ class Record(BaseModel):
                 "Offset is already set, cannot create a new record at a different offset"
             )
         return self.model_copy(deep=True, update={"offset": offset})
+
+
+class Segment(abc.ABC, pydantic.BaseModel):
+    log_path: Path
+    index_path: Path
+    size_limit: int
+
+    dirname_pattern: ClassVar[re.Pattern] = re.compile(
+        r"^(?P<topic>.+)-(?P<partition>\d+)$"
+    )
+
+    @property
+    def topic(self) -> str:
+        dirname = self.log_path.parent.stem
+        match = self.dirname_pattern.match(dirname)
+        return match.group("topic")
+
+    @property
+    def partition(self) -> int:
+        dirname = self.log_path.parent.stem
+        match = self.dirname_pattern.match(dirname)
+        return int(match.group("partition"))
+
+    @abc.abstractmethod
+    def append(self, record: Record) -> None:
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def read(self, start_offset: int, max_bytes: int) -> list[Record]:
+        raise NotImplementedError
