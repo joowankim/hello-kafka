@@ -163,3 +163,43 @@ def test_roll(partition: Partition, expected: Partition):
     rolled = partition.roll()
 
     assert rolled == expected
+
+
+@pytest.mark.parametrize(
+    "partition, expected",
+    [
+        (
+            dict(
+                topic="test-topic",
+                num=0,
+                segments=[dict(base_offset=0)],
+                leo=0,
+            ),
+            dict(
+                topic="test-topic",
+                num=0,
+                segments=[dict(base_offset=0)],
+                leo=1,
+            ),
+        ),
+        (
+            dict(
+                topic="another-topic",
+                num=1,
+                segments=[dict(base_offset=100)],
+                leo=50,
+            ),
+            dict(
+                topic="another-topic",
+                num=1,
+                segments=[dict(base_offset=100)],
+                leo=51,
+            ),
+        ),
+    ],
+    indirect=["partition", "expected"],
+)
+def test_commit_record(partition: Partition, expected: Partition):
+    recorded = partition.commit_record()
+
+    assert recorded == expected

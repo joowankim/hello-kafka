@@ -89,3 +89,6 @@ class Partition(pydantic.BaseModel):
         return self.model_copy(
             deep=True, update={"segments": self.segments + [new_segment]}
         )
+
+    def commit_record(self) -> Self:
+        return self.model_copy(deep=True, update={"leo": self.leo + 1})
