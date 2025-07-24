@@ -75,3 +75,7 @@ class Partition(pydantic.BaseModel):
     num: int
     segments: list[Segment] = Field(min_length=1)
     leo: int
+
+    @property
+    def name(self) -> str:
+        return f"{self.topic}-{self.num}"
