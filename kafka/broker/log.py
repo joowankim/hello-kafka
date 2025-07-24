@@ -79,3 +79,7 @@ class Partition(pydantic.BaseModel):
     @property
     def name(self) -> str:
         return f"{self.topic}-{self.num}"
+
+    @property
+    def active_segment(self) -> Segment:
+        return self.segments[-1]

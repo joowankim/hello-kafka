@@ -58,3 +58,40 @@ def partition(
 )
 def test_name(partition: Partition, expected: str):
     assert partition.name == expected
+
+
+@pytest.mark.parametrize(
+    "partition, expected",
+    [
+        (
+            dict(
+                topic="test-topic",
+                num=0,
+                segments=[dict(base_offset=0)],
+                leo=0,
+            ),
+            Segment(base_offset=0),
+        ),
+        (
+            dict(
+                topic="another-topic",
+                num=1,
+                segments=[dict(base_offset=100)],
+                leo=150,
+            ),
+            Segment(base_offset=100),
+        ),
+        (
+            dict(
+                topic="topic-with-multiple-segments",
+                num=2,
+                segments=[dict(base_offset=200), dict(base_offset=300)],
+                leo=350,
+            ),
+            Segment(base_offset=300),
+        ),
+    ],
+    indirect=["partition"],
+)
+def test_active_segment(partition: Partition, expected: Segment):
+    assert partition.active_segment == expected
