@@ -1,4 +1,3 @@
-import json
 import re
 from pathlib import Path
 from typing import Self, ClassVar
@@ -116,22 +115,16 @@ class FSLogStorage:
             index_file.write(new_record.index_entry(position))
         self.partitions[(partition.topic, partition.num)] = partition.commit_record()
 
-    def list_segments(self, topic_name: str, partition_num: int) -> list[int]:
-        partition_path = self.root_path / f"{topic_name}-{partition_num}"
-        if not partition_path.exists():
-            raise PartitionNotFoundError(
-                f"Partition {topic_name}-{partition_num} does not exist"
-            )
-        return [int(p.stem) for p in partition_path.glob("*.log")]
-
     def list_logs(self, qry: query.Fetch) -> list[log.Record]:
-        segments = self.list_segments(topic_name=qry.topic, partition_num=qry.partition)
-        nearest_segment = max(s for s in segments if s <= qry.offset)
-        index_path = (
-            self.root_path
-            / qry.partition_dirname
-            / f"{nearest_segment:0{constants.LOG_FILENAME_LENGTH}d}.index"
+        if (partition := self.partitions.get((qry.topic, qry.partition))) is None:
+            raise PartitionNotFoundError(
+                f"Partition {qry.topic}-{qry.partition} does not exist"
+            )
+        partition_path = self.root_path / partition.name
+        nearest_segment = max(
+            s for s in partition.segments if s.base_offset <= qry.offset
         )
+        index_path = partition_path / nearest_segment.index
         with index_path.open("rb") as index_file:
             while True:
                 index_entry = index_file.read(
@@ -148,11 +141,7 @@ class FSLogStorage:
                     break
         if int(offset) != qry.offset:
             return []
-        log_path = (
-            self.root_path
-            / qry.partition_dirname
-            / f"{nearest_segment:0{constants.LOG_FILENAME_LENGTH}d}.log"
-        )
+        log_path = partition_path / nearest_segment.log
         result = []
         total_record_size = 0
         with log_path.open("rb") as log_file:
@@ -162,41 +151,33 @@ class FSLogStorage:
                 if not record_size_str:
                     break
                 record_size = int(record_size_str)
-                record_data = json.loads(log_file.read(record_size).decode("utf-8"))
-                record = log.Record.model_validate(
-                    record_data
-                    | {
-                        "topic": qry.topic,
-                        "partition": qry.partition,
-                    }
+                record = log.Record.from_log(
+                    topic=qry.topic,
+                    partition=qry.partition,
+                    record_data=log_file.read(record_size),
                 )
                 total_record_size += record.size
                 if total_record_size > qry.max_bytes:
                     break
                 result.append(record)
         if total_record_size < qry.max_bytes:
-            after_segments = [s for s in segments if s > nearest_segment]
+            after_segments = [
+                s
+                for s in partition.segments
+                if s.base_offset > nearest_segment.base_offset
+            ]
             for segment in after_segments:
-                log_path = (
-                    self.root_path
-                    / qry.partition_dirname
-                    / f"{segment:0{constants.LOG_FILENAME_LENGTH}d}.log"
-                )
+                log_path = partition_path / segment.log
                 with log_path.open("rb") as log_file:
                     while True:
                         record_size_str = log_file.read(constants.PAYLOAD_LENGTH_WIDTH)
                         if not record_size_str:
                             break
                         record_size = int(record_size_str)
-                        record_data = json.loads(
-                            log_file.read(record_size).decode("utf-8")
-                        )
-                        record = log.Record.model_validate(
-                            record_data
-                            | {
-                                "topic": qry.topic,
-                                "partition": qry.partition,
-                            }
+                        record = log.Record.from_log(
+                            topic=qry.topic,
+                            partition=qry.partition,
+                            record_data=log_file.read(record_size),
                         )
                         total_record_size += record.size
                         if total_record_size > qry.max_bytes:
