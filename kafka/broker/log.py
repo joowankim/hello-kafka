@@ -57,6 +57,12 @@ class Record(pydantic.BaseModel):
             )
         return self.model_copy(deep=True, update={"offset": offset})
 
+    def index_entry(self, position: int) -> bytes:
+        return (
+            f"{self.offset:0{constants.LOG_RECORD_OFFSET_WIDTH}d}"
+            f"{position:0{constants.LOG_RECORD_POSITION_WIDTH}d}"
+        ).encode("utf-8")
+
 
 class Segment(pydantic.BaseModel):
     base_offset: int

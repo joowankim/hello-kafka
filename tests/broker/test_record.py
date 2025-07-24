@@ -212,3 +212,25 @@ def test_from_produce_command(produce_command: Produce, expected_records: list[R
     records = Record.from_produce_command(produce_command)
 
     assert records == expected_records
+
+
+@pytest.mark.parametrize(
+    "log_record, position, expected",
+    [
+        (
+            ("test-topic", 0, "dGVzdC12YWx1ZQ==", None, 1752735958, {}, 0),
+            0,
+            b"0000000000000000",
+        ),
+        (
+            ("another-topic", 1, "YW5vdGhlci12YWx1ZQ==", None, 1752735959, {}, 3),
+            100,
+            b"0000000300000100",
+        ),
+    ],
+    indirect=["log_record"],
+)
+def test_index_entry(log_record: Record, position: int, expected: bytes):
+    entry = log_record.index_entry(position)
+
+    assert entry == expected
