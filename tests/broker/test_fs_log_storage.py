@@ -177,115 +177,87 @@ def initiated_log_storage(
     log_storage = FSLogStorage(
         root_path=tmp_path,
         log_file_size_limit=constants.LOG_FILE_SIZE_LIMIT,
-        leo_map={},
+        partitions={},
     )
     log_storage.init_topic(topic_name=topic_name, num_partitions=num_partitions)
     return log_storage
 
 
 @pytest.mark.parametrize(
-    "initiated_log_storage, topic_name, num_partitions, expected",
+    "initiated_log_storage, topic_name, num_partitions, expected_partitions",
     [
         (
             ("test-topic", 3),
             "test-topic",
             1,
-            (
-                {
-                    ("test-topic", 0): 0,
-                    ("test-topic", 1): 0,
-                    ("test-topic", 2): 0,
-                    ("test-topic", 3): 0,
-                },
-                [
-                    Path("test-topic-0"),
-                    Path("test-topic-0/00000000000000000000.log"),
-                    Path("test-topic-0/00000000000000000000.index"),
-                    Path("test-topic-1"),
-                    Path("test-topic-1/00000000000000000000.log"),
-                    Path("test-topic-1/00000000000000000000.index"),
-                    Path("test-topic-2"),
-                    Path("test-topic-2/00000000000000000000.log"),
-                    Path("test-topic-2/00000000000000000000.index"),
-                    Path("test-topic-3"),
-                    Path("test-topic-3/00000000000000000000.log"),
-                    Path("test-topic-3/00000000000000000000.index"),
-                ],
-            ),
+            {
+                ("test-topic", 0): dict(
+                    topic="test-topic", num=0, segments=[dict(base_offset=0)], leo=0
+                ),
+                ("test-topic", 1): dict(
+                    topic="test-topic", num=1, segments=[dict(base_offset=0)], leo=0
+                ),
+                ("test-topic", 2): dict(
+                    topic="test-topic", num=2, segments=[dict(base_offset=0)], leo=0
+                ),
+                ("test-topic", 3): dict(
+                    topic="test-topic", num=3, segments=[dict(base_offset=0)], leo=0
+                ),
+            },
         ),
         (
             ("test-topic", 2),
             "test-topic",
             2,
-            (
-                {
-                    ("test-topic", 0): 0,
-                    ("test-topic", 1): 0,
-                    ("test-topic", 2): 0,
-                    ("test-topic", 3): 0,
-                },
-                [
-                    Path("test-topic-0"),
-                    Path("test-topic-0/00000000000000000000.log"),
-                    Path("test-topic-0/00000000000000000000.index"),
-                    Path("test-topic-1"),
-                    Path("test-topic-1/00000000000000000000.log"),
-                    Path("test-topic-1/00000000000000000000.index"),
-                    Path("test-topic-2"),
-                    Path("test-topic-2/00000000000000000000.log"),
-                    Path("test-topic-2/00000000000000000000.index"),
-                    Path("test-topic-3"),
-                    Path("test-topic-3/00000000000000000000.log"),
-                    Path("test-topic-3/00000000000000000000.index"),
-                ],
-            ),
+            {
+                ("test-topic", 0): dict(
+                    topic="test-topic", num=0, segments=[dict(base_offset=0)], leo=0
+                ),
+                ("test-topic", 1): dict(
+                    topic="test-topic", num=1, segments=[dict(base_offset=0)], leo=0
+                ),
+                ("test-topic", 2): dict(
+                    topic="test-topic", num=2, segments=[dict(base_offset=0)], leo=0
+                ),
+                ("test-topic", 3): dict(
+                    topic="test-topic", num=3, segments=[dict(base_offset=0)], leo=0
+                ),
+            },
         ),
         (
             ("test-topic", 1),
             "another-topic",
             3,
-            (
-                {
-                    ("test-topic", 0): 0,
-                    ("another-topic", 0): 0,
-                    ("another-topic", 1): 0,
-                    ("another-topic", 2): 0,
-                },
-                [
-                    Path("test-topic-0"),
-                    Path("test-topic-0/00000000000000000000.log"),
-                    Path("test-topic-0/00000000000000000000.index"),
-                    Path("another-topic-0"),
-                    Path("another-topic-0/00000000000000000000.log"),
-                    Path("another-topic-0/00000000000000000000.index"),
-                    Path("another-topic-1"),
-                    Path("another-topic-1/00000000000000000000.log"),
-                    Path("another-topic-1/00000000000000000000.index"),
-                    Path("another-topic-2"),
-                    Path("another-topic-2/00000000000000000000.log"),
-                    Path("another-topic-2/00000000000000000000.index"),
-                ],
-            ),
+            {
+                ("test-topic", 0): dict(
+                    topic="test-topic", num=0, segments=[dict(base_offset=0)], leo=0
+                ),
+                ("another-topic", 0): dict(
+                    topic="another-topic", num=0, segments=[dict(base_offset=0)], leo=0
+                ),
+                ("another-topic", 1): dict(
+                    topic="another-topic", num=1, segments=[dict(base_offset=0)], leo=0
+                ),
+                ("another-topic", 2): dict(
+                    topic="another-topic", num=2, segments=[dict(base_offset=0)], leo=0
+                ),
+            },
         ),
     ],
-    indirect=["initiated_log_storage"],
+    indirect=["initiated_log_storage", "expected_partitions"],
 )
 def test_append_partitions(
     initiated_log_storage: FSLogStorage,
     topic_name: str,
     num_partitions: int,
     tmp_path: Path,
-    expected: tuple[dict[tuple[str, int], int], list[Path]],
+    expected_partitions: dict[tuple[str, int], Partition],
 ):
     initiated_log_storage.append_partitions(
         topic_name=topic_name, num_partitions=num_partitions
     )
 
-    leo_map, paths = expected
-    assert initiated_log_storage.leo_map == leo_map
-    for filename in paths:
-        file_path = tmp_path / filename
-        assert file_path.exists()
+    assert initiated_log_storage.partitions == expected_partitions
 
 
 def test_init_partition(fs_log_storage: FSLogStorage, tmp_path: Path):
