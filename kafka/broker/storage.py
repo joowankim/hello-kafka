@@ -121,67 +121,40 @@ class FSLogStorage:
                 f"Partition {qry.topic}-{qry.partition} does not exist"
             )
         partition_path = self.root_path / partition.name
-        nearest_segment = max(
-            s for s in partition.segments if s.base_offset <= qry.offset
-        )
-        index_path = partition_path / nearest_segment.index
-        with index_path.open("rb") as index_file:
-            while True:
-                index_entry = index_file.read(
-                    constants.LOG_RECORD_OFFSET_WIDTH
-                    + constants.LOG_RECORD_POSITION_WIDTH
-                )
-                if not index_entry:
-                    break
-                offset, pos = (
-                    index_entry[: constants.LOG_RECORD_OFFSET_WIDTH],
-                    index_entry[constants.LOG_RECORD_OFFSET_WIDTH :],
-                )
-                if offset == qry.offset:
-                    break
-        if int(offset) != qry.offset:
-            return []
-        log_path = partition_path / nearest_segment.log
-        result = []
+        over_start_offset = [
+            s for s in partition.segments if s.base_offset > qry.offset
+        ]
+        read_targets = partition.segments[-(1 + len(over_start_offset)) :]
         total_record_size = 0
-        with log_path.open("rb") as log_file:
-            log_file.seek(int(pos))
-            while True:
-                record_size_str = log_file.read(constants.PAYLOAD_LENGTH_WIDTH)
-                if not record_size_str:
-                    break
-                record_size = int(record_size_str)
-                record = log.Record.from_log(
-                    topic=qry.topic,
-                    partition=qry.partition,
-                    record_data=log_file.read(record_size),
-                )
-                total_record_size += record.size
-                if total_record_size > qry.max_bytes:
-                    break
-                result.append(record)
-        if total_record_size < qry.max_bytes:
-            after_segments = [
-                s
-                for s in partition.segments
-                if s.base_offset > nearest_segment.base_offset
-            ]
-            for segment in after_segments:
-                log_path = partition_path / segment.log
+        result = []
+        for segment in read_targets:
+            log_path = partition_path / segment.log
+            index_path = partition_path / segment.index
+            with index_path.open("rb") as index_file:
                 with log_path.open("rb") as log_file:
-                    while True:
-                        record_size_str = log_file.read(constants.PAYLOAD_LENGTH_WIDTH)
-                        if not record_size_str:
+                    while total_record_size < qry.max_bytes:
+                        index_entry = index_file.read(
+                            constants.LOG_RECORD_OFFSET_WIDTH
+                            + constants.LOG_RECORD_POSITION_WIDTH
+                        )
+                        if not index_entry:
                             break
-                        record_size = int(record_size_str)
+                        offset, pos = (
+                            int(index_entry[: constants.LOG_RECORD_OFFSET_WIDTH]),
+                            int(index_entry[constants.LOG_RECORD_OFFSET_WIDTH :]),
+                        )
+                        if offset < qry.offset:
+                            continue
+                        log_file.seek(pos)
+                        record_size = int(log_file.read(constants.PAYLOAD_LENGTH_WIDTH))
                         record = log.Record.from_log(
-                            topic=qry.topic,
-                            partition=qry.partition,
+                            topic=partition.topic,
+                            partition=partition.num,
                             record_data=log_file.read(record_size),
                         )
-                        total_record_size += record.size
-                        if total_record_size > qry.max_bytes:
+                        if total_record_size + record.size > qry.max_bytes:
                             break
                         result.append(record)
+                        total_record_size += record.size
 
         return result
