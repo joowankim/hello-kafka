@@ -146,7 +146,9 @@ class FSLogStorage:
                         if offset < qry.offset:
                             continue
                         log_file.seek(pos)
-                        record_size = int(log_file.read(constants.PAYLOAD_LENGTH_WIDTH))
+                        record_size = int.from_bytes(
+                            log_file.read(constants.PAYLOAD_LENGTH_WIDTH), "big"
+                        )
                         record = log.Record.from_log(
                             topic=partition.topic,
                             partition=partition.num,
