@@ -38,3 +38,9 @@ class InvalidOffsetError(NonRetriableError):
     """잘못된 오프셋에 대한 예외"""
 
     pass
+
+
+class ExceedSegmentSizeError(NonRetriableError):
+    """세그먼트 크기를 초과하는 경우 발생하는 예외"""
+
+    pass

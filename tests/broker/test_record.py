@@ -1,4 +1,3 @@
-from pathlib import Path
 from typing import Any
 
 import pytest
@@ -27,16 +26,16 @@ def log_record(base_log_record: Record, request: pytest.FixtureRequest) -> Recor
 @pytest.mark.parametrize(
     "log_record, expected",
     [
-        (("test-topic", 0, b"hello", None, 1752735958, {}, 0), Path("test-topic-0")),
+        (("test-topic", 0, b"hello", None, 1752735958, {}, 0), "test-topic-0"),
         (
             ("another-topic", 2, b"hello", None, 1752735958, {}, 0),
-            Path("another-topic-2"),
+            "another-topic-2",
         ),
     ],
     indirect=["log_record"],
 )
-def test_partition_dirname(log_record: Record, expected: Path):
-    assert log_record.partition_dirname == expected
+def test_partition_name(log_record: Record, expected: str):
+    assert log_record.partition_name == expected
 
 
 @pytest.mark.parametrize(
@@ -212,3 +211,75 @@ def test_from_produce_command(produce_command: Produce, expected_records: list[R
     records = Record.from_produce_command(produce_command)
 
     assert records == expected_records
+
+
+@pytest.mark.parametrize(
+    "log_record, position, expected",
+    [
+        (
+            ("test-topic", 0, "dGVzdC12YWx1ZQ==", None, 1752735958, {}, 0),
+            0,
+            b"0000000000000000",
+        ),
+        (
+            ("another-topic", 1, "YW5vdGhlci12YWx1ZQ==", None, 1752735959, {}, 3),
+            100,
+            b"0000000300000100",
+        ),
+    ],
+    indirect=["log_record"],
+)
+def test_index_entry(log_record: Record, position: int, expected: bytes):
+    entry = log_record.index_entry(position)
+
+    assert entry == expected
+
+
+@pytest.fixture
+def expected_record(base_log_record: Record, request: pytest.FixtureRequest) -> Record:
+    topic_name, partition_num, value, key, timestamp, headers, offset = request.param
+    return base_log_record.model_copy(
+        update=dict(
+            topic=topic_name,
+            partition=partition_num,
+            value=value,
+            key=key,
+            timestamp=timestamp,
+            headers=headers,
+            offset=offset,
+        )
+    )
+
+
+@pytest.mark.parametrize(
+    "topic, partition, record_data, expected_record",
+    [
+        (
+            "test-topic",
+            0,
+            b"{"
+            b'"value":"dGVzdC12YWx1ZQ==",'
+            b'"key":null,'
+            b'"timestamp":1752735958,'
+            b'"headers":{},'
+            b'"offset":0'
+            b"}",
+            (
+                "test-topic",
+                0,
+                "dGVzdC12YWx1ZQ==",
+                None,
+                1752735958,
+                {},
+                0,
+            ),
+        ),
+    ],
+    indirect=["expected_record"],
+)
+def test_from_log(
+    topic: str, partition: int, record_data: bytes, expected_record: Record
+):
+    record = Record.from_log(topic=topic, partition=partition, record_data=record_data)
+
+    assert record == expected_record

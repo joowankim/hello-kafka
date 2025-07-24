@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Self, ClassVar
 
 from kafka import constants
-from kafka.broker import log
+from kafka.broker import log, query
 from kafka.error import InvalidAdminCommandError, PartitionNotFoundError
 
 
@@ -16,48 +16,59 @@ class FSLogStorage:
         self,
         root_path: Path,
         log_file_size_limit: int,
-        leo_map: dict[tuple[str, int], int],
+        partitions: dict[tuple[str, int], log.Partition],
     ):
         self.root_path = root_path
         self.log_file_size_limit = log_file_size_limit
-        self.leo_map = leo_map
+        self.partitions = partitions
         if not root_path.exists():
             root_path.mkdir(parents=True, exist_ok=True)
 
     @classmethod
     def load_from_root(cls, root_path: Path, log_file_size_limit: int) -> Self:
-        leo_map = {}
+        partitions = []
         for partition_path in root_path.glob("*-*"):
             topic_name, partition_num = partition_path.name.split("-")
-            log_end_segment_id = max(int(p.stem) for p in partition_path.glob("*.log"))
-            with (
-                partition_path
-                / f"{log_end_segment_id:0{constants.LOG_FILENAME_LENGTH}d}.log"
-            ).open("rb") as log_file:
+            base_offsets = sorted(int(p.stem) for p in partition_path.glob("*.log"))
+            if not base_offsets:
+                continue
+            segments = [log.Segment(base_offset=offset) for offset in base_offsets]
+            with (partition_path / segments[-1].log).open("rb") as log_file:
                 records = []
                 while payload_size_str := log_file.read(constants.PAYLOAD_LENGTH_WIDTH):
                     payload_size = int(payload_size_str)
                     payload_data = log_file.read(payload_size).decode("utf-8")
                     records.append(payload_data)
-                log_end_offset = log_end_segment_id + len(records)
-            leo_map[(topic_name, int(partition_num))] = log_end_offset
+                log_end_offset = segments[-1].base_offset + len(records)
+            partitions.append(
+                log.Partition(
+                    topic=topic_name,
+                    num=int(partition_num),
+                    segments=segments,
+                    leo=log_end_offset,
+                )
+            )
         return cls(
             root_path=root_path,
             log_file_size_limit=log_file_size_limit,
-            leo_map=leo_map,
+            partitions={(p.topic, p.num): p for p in partitions},
         )
 
     def init_partition(self, topic_name: str, partition_num: int) -> None:
         partition_path = self.root_path / f"{topic_name}-{partition_num}"
         if not partition_path.exists():
             partition_path.mkdir(parents=True, exist_ok=True)
-        log_file_path = partition_path / f"{0:0{constants.LOG_FILENAME_LENGTH}d}.log"
+        new_segment = log.Segment(base_offset=0)
+        log_file_path = partition_path / new_segment.log
         log_file_path.touch()
-        index_file_path = (
-            partition_path / f"{0:0{constants.LOG_FILENAME_LENGTH}d}.index"
-        )
+        index_file_path = partition_path / new_segment.index
         index_file_path.touch()
-        self.leo_map[(topic_name, partition_num)] = 0
+        self.partitions[(topic_name, partition_num)] = log.Partition(
+            topic=topic_name,
+            num=partition_num,
+            segments=[new_segment],
+            leo=0,
+        )
 
     def init_topic(self, topic_name: str, num_partitions: int) -> None:
         if num_partitions <= 0:
@@ -81,36 +92,72 @@ class FSLogStorage:
             self.init_partition(topic_name=topic_name, partition_num=partition_num)
 
     def append_log(self, record: log.Record) -> None:
-        partition_path = self.root_path / record.partition_dirname
-        if not partition_path.exists():
-            raise PartitionNotFoundError("Partition test-topic-1 does not exist")
-        segment_id = max(int(p.stem) for p in partition_path.glob("*.log"))
-        log_path = (
-            partition_path / f"{segment_id:0{constants.LOG_FILENAME_LENGTH}d}.log"
-        )
-        index_path = (
-            partition_path / f"{segment_id:0{constants.LOG_FILENAME_LENGTH}d}.index"
-        )
-        new_record = record.record_at(self.leo_map[(record.topic, record.partition)])
+        if (partition := self.partitions.get((record.topic, record.partition))) is None:
+            raise PartitionNotFoundError(
+                f"Partition {record.partition_name} does not exist"
+            )
+        partition_path = self.root_path / partition.name
+        log_path = partition_path / partition.active_segment.log
+        index_path = partition_path / partition.active_segment.index
+        new_record = record.record_at(partition.leo)
         new_record_binary = new_record.bin
         current_log_file_size = log_path.stat().st_size + len(new_record_binary)
         if current_log_file_size > self.log_file_size_limit:
-            segment_id += 1
-            log_path = (
-                partition_path / f"{segment_id:0{constants.LOG_FILENAME_LENGTH}d}.log"
-            )
-            index_path = (
-                partition_path / f"{segment_id:0{constants.LOG_FILENAME_LENGTH}d}.index"
-            )
+            partition = partition.roll()
+            log_path = partition_path / partition.active_segment.log
+            index_path = partition_path / partition.active_segment.index
             log_path.touch()
             index_path.touch()
         with log_path.open("ab") as log_file:
+            position = log_file.tell()
             log_file.write(new_record_binary)
         with index_path.open("ab") as index_file:
-            index_file.write(
-                f"{new_record.offset:0{constants.LOG_RECORD_OFFSET_WIDTH}d}"
-                f"{current_log_file_size:0{constants.LOG_RECORD_POSITION_WIDTH}d}".encode(
-                    "utf-8"
-                )
+            index_file.write(new_record.index_entry(position))
+        self.partitions[(partition.topic, partition.num)] = partition.commit_record()
+
+    def list_logs(self, qry: query.Fetch) -> list[log.Record]:
+        if (partition := self.partitions.get((qry.topic, qry.partition))) is None:
+            raise PartitionNotFoundError(
+                f"Partition {qry.topic}-{qry.partition} does not exist"
             )
-        self.leo_map[(record.topic, record.partition)] += 1
+        partition_path = self.root_path / partition.name
+        over_start_offset = [
+            s for s in partition.segments if s.base_offset > qry.offset
+        ]
+        read_targets = partition.segments[-(1 + len(over_start_offset)) :]
+        total_record_size = 0
+        result = []
+        for segment in read_targets:
+            log_path = partition_path / segment.log
+            index_path = partition_path / segment.index
+            with index_path.open("rb") as index_file:
+                with log_path.open("rb") as log_file:
+                    while total_record_size < qry.max_bytes:
+                        index_entry = index_file.read(
+                            constants.LOG_RECORD_OFFSET_WIDTH
+                            + constants.LOG_RECORD_POSITION_WIDTH
+                        )
+                        if not index_entry:
+                            break
+                        offset, pos = (
+                            int(index_entry[: constants.LOG_RECORD_OFFSET_WIDTH]),
+                            int(index_entry[constants.LOG_RECORD_OFFSET_WIDTH :]),
+                        )
+                        if offset < qry.offset:
+                            continue
+                        log_file.seek(pos)
+                        record_size_str = log_file.read(constants.PAYLOAD_LENGTH_WIDTH)
+                        if not record_size_str:
+                            break
+                        record_size = int(record_size_str)
+                        record = log.Record.from_log(
+                            topic=partition.topic,
+                            partition=partition.num,
+                            record_data=log_file.read(record_size),
+                        )
+                        if total_record_size + record.size > qry.max_bytes:
+                            break
+                        result.append(record)
+                        total_record_size += record.size
+
+        return result
