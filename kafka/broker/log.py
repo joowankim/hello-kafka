@@ -1,7 +1,5 @@
-import abc
-import re
 from pathlib import Path
-from typing import Self, ClassVar
+from typing import Self
 
 import pydantic
 
@@ -59,31 +57,13 @@ class Record(pydantic.BaseModel):
         return self.model_copy(deep=True, update={"offset": offset})
 
 
-class Segment(abc.ABC, pydantic.BaseModel):
-    log_path: Path
-    index_path: Path
-    size_limit: int
-
-    dirname_pattern: ClassVar[re.Pattern] = re.compile(
-        r"^(?P<topic>.+)-(?P<partition>\d+)$"
-    )
+class Segment(pydantic.BaseModel):
+    base_offset: int
 
     @property
-    def topic(self) -> str:
-        dirname = self.log_path.parent.stem
-        match = self.dirname_pattern.match(dirname)
-        return match.group("topic")
+    def log(self) -> str:
+        return f"{self.base_offset:0{constants.LOG_FILENAME_LENGTH}d}.log"
 
     @property
-    def partition(self) -> int:
-        dirname = self.log_path.parent.stem
-        match = self.dirname_pattern.match(dirname)
-        return int(match.group("partition"))
-
-    @abc.abstractmethod
-    def append(self, record: Record) -> None:
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def read(self, start_offset: int, max_bytes: int) -> list[Record]:
-        raise NotImplementedError
+    def index(self) -> str:
+        return f"{self.base_offset:0{constants.LOG_FILENAME_LENGTH}d}.index"
