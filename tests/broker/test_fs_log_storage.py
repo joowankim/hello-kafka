@@ -1,10 +1,11 @@
+from typing import Any
 import shutil
 from pathlib import Path
 
 import pytest
 
 from kafka import constants
-from kafka.broker.log import Record
+from kafka.broker.log import Record, Partition, Segment
 from kafka.broker.query import Fetch
 from kafka.broker.storage import FSLogStorage
 from kafka.error import InvalidAdminCommandError, PartitionNotFoundError
@@ -21,22 +22,82 @@ def root_path(
     return tmp_path
 
 
+@pytest.fixture
+def expected_partitions(
+    base_segment: Segment,
+    base_partition: Partition,
+    request: pytest.FixtureRequest,
+) -> dict[tuple[str, int], Partition]:
+    partitions_params: dict[tuple[str, int], dict[str, Any]] = request.param
+    return {
+        (topic, num): base_partition.model_copy(
+            update=dict(
+                topic=partition_data["topic"],
+                num=partition_data["num"],
+                segments=[
+                    base_segment.model_copy(update=segment_data)
+                    for segment_data in partition_data["segments"]
+                ],
+                leo=partition_data["leo"],
+            )
+        )
+        for (topic, num), partition_data in partitions_params.items()
+    }
+
+
 @pytest.mark.parametrize(
-    "root_path, expected",
+    "root_path, expected_partitions",
     [
         ("root-empty", {}),
-        ("root-limit_1GB", {("topic01", 0): 1, ("topic01", 1): 0}),
-        ("root-limit_100B", {("topic01", 0): 2, ("topic01", 1): 0}),
+        (
+            "root-limit_1GB",
+            {
+                ("topic01", 0): dict(
+                    topic="topic01",
+                    num=0,
+                    segments=[dict(base_offset=0)],
+                    leo=1,
+                ),
+                ("topic01", 1): dict(
+                    topic="topic01",
+                    num=1,
+                    segments=[dict(base_offset=0)],
+                    leo=0,
+                ),
+            },
+        ),
+        (
+            "root-limit_100B",
+            {
+                ("topic01", 0): dict(
+                    topic="topic01",
+                    num=0,
+                    segments=[
+                        dict(base_offset=0),
+                        dict(base_offset=1),
+                    ],
+                    leo=2,
+                ),
+                ("topic01", 1): dict(
+                    topic="topic01",
+                    num=1,
+                    segments=[dict(base_offset=0)],
+                    leo=0,
+                ),
+            },
+        ),
     ],
-    indirect=["root_path"],
+    indirect=["root_path", "expected_partitions"],
 )
-def test_load_from_root(root_path: Path, expected: dict[tuple[str, int], int]):
+def test_load_from_root(
+    root_path: Path, expected_partitions: dict[tuple[str, int], Partition]
+):
     log_file_size_limit = constants.LOG_FILE_SIZE_LIMIT
     log_storage = FSLogStorage.load_from_root(
         root_path=root_path, log_file_size_limit=log_file_size_limit
     )
 
-    assert log_storage.leo_map == expected
+    assert log_storage.partitions == expected_partitions
 
 
 @pytest.fixture

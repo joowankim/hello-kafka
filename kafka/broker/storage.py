@@ -17,35 +17,42 @@ class FSLogStorage:
         self,
         root_path: Path,
         log_file_size_limit: int,
-        leo_map: dict[tuple[str, int], int],
+        partitions: dict[tuple[str, int], log.Partition],
     ):
         self.root_path = root_path
         self.log_file_size_limit = log_file_size_limit
-        self.leo_map = leo_map
+        self.partitions = partitions
         if not root_path.exists():
             root_path.mkdir(parents=True, exist_ok=True)
 
     @classmethod
     def load_from_root(cls, root_path: Path, log_file_size_limit: int) -> Self:
-        leo_map = {}
+        partitions = []
         for partition_path in root_path.glob("*-*"):
             topic_name, partition_num = partition_path.name.split("-")
-            log_end_segment_id = max(int(p.stem) for p in partition_path.glob("*.log"))
-            with (
-                partition_path
-                / f"{log_end_segment_id:0{constants.LOG_FILENAME_LENGTH}d}.log"
-            ).open("rb") as log_file:
+            base_offsets = sorted(int(p.stem) for p in partition_path.glob("*.log"))
+            if not base_offsets:
+                continue
+            segments = [log.Segment(base_offset=offset) for offset in base_offsets]
+            with (partition_path / segments[-1].log).open("rb") as log_file:
                 records = []
                 while payload_size_str := log_file.read(constants.PAYLOAD_LENGTH_WIDTH):
                     payload_size = int(payload_size_str)
                     payload_data = log_file.read(payload_size).decode("utf-8")
                     records.append(payload_data)
-                log_end_offset = log_end_segment_id + len(records)
-            leo_map[(topic_name, int(partition_num))] = log_end_offset
+                log_end_offset = segments[-1].base_offset + len(records)
+            partitions.append(
+                log.Partition(
+                    topic=topic_name,
+                    num=int(partition_num),
+                    segments=segments,
+                    leo=log_end_offset,
+                )
+            )
         return cls(
             root_path=root_path,
             log_file_size_limit=log_file_size_limit,
-            leo_map=leo_map,
+            partitions={(p.topic, p.num): p for p in partitions},
         )
 
     def init_partition(self, topic_name: str, partition_num: int) -> None:

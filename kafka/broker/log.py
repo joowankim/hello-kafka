@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import Self
 
 import pydantic
+from pydantic import Field
 
 from kafka import constants
 from kafka.broker import command
@@ -67,3 +68,10 @@ class Segment(pydantic.BaseModel):
     @property
     def index(self) -> str:
         return f"{self.base_offset:0{constants.LOG_FILENAME_LENGTH}d}.index"
+
+
+class Partition(pydantic.BaseModel):
+    topic: str
+    num: int
+    segments: list[Segment] = Field(min_length=1)
+    leo: int
