@@ -1,4 +1,3 @@
-from pathlib import Path
 from typing import Any
 
 import pytest
@@ -27,16 +26,16 @@ def log_record(base_log_record: Record, request: pytest.FixtureRequest) -> Recor
 @pytest.mark.parametrize(
     "log_record, expected",
     [
-        (("test-topic", 0, b"hello", None, 1752735958, {}, 0), Path("test-topic-0")),
+        (("test-topic", 0, b"hello", None, 1752735958, {}, 0), "test-topic-0"),
         (
             ("another-topic", 2, b"hello", None, 1752735958, {}, 0),
-            Path("another-topic-2"),
+            "another-topic-2",
         ),
     ],
     indirect=["log_record"],
 )
-def test_partition_dirname(log_record: Record, expected: Path):
-    assert log_record.partition_dirname == expected
+def test_partition_name(log_record: Record, expected: str):
+    assert log_record.partition_name == expected
 
 
 @pytest.mark.parametrize(

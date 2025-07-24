@@ -1,4 +1,3 @@
-from pathlib import Path
 from typing import Self
 
 import pydantic
@@ -19,8 +18,8 @@ class Record(pydantic.BaseModel):
     offset: int | None
 
     @property
-    def partition_dirname(self) -> Path:
-        return Path(f"{self.topic}-{self.partition}")
+    def partition_name(self) -> str:
+        return f"{self.topic}-{self.partition}"
 
     @property
     def bin(self) -> bytes:

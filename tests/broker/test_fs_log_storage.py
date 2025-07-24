@@ -293,13 +293,17 @@ def log_record(base_log_record: Record, request: pytest.FixtureRequest) -> Recor
 
 
 @pytest.mark.parametrize(
-    "initiated_log_storage, log_record, expected",
+    "initiated_log_storage, log_record, expected_partitions, expected_records",
     [
         (
             ("test-topic", 1),
             ("test-topic", 0, "dGVzdC12YWx1ZQ==", None, 1752735958, {}),
-            (
-                {("test-topic", 0): 1},
+            {
+                ("test-topic", 0): dict(
+                    topic="test-topic", num=0, segments=[dict(base_offset=0)], leo=1
+                )
+            },
+            [
                 b"0086"
                 b"{"
                 b'"value":"dGVzdC12YWx1ZQ==",'
@@ -308,13 +312,17 @@ def log_record(base_log_record: Record, request: pytest.FixtureRequest) -> Recor
                 b'"headers":{},'
                 b'"offset":0'
                 b"}",
-            ),
+            ],
         ),
         (
             ("another-topic", 1),
             ("another-topic", 0, "YW5vdGhlci12YWx1ZQ==", None, 1752735959, {}),
-            (
-                {("another-topic", 0): 1},
+            {
+                ("another-topic", 0): dict(
+                    topic="another-topic", num=0, segments=[dict(base_offset=0)], leo=1
+                ),
+            },
+            [
                 b"0090"
                 b"{"
                 b'"value":"YW5vdGhlci12YWx1ZQ==",'
@@ -323,17 +331,24 @@ def log_record(base_log_record: Record, request: pytest.FixtureRequest) -> Recor
                 b'"headers":{},'
                 b'"offset":0'
                 b"}",
-            ),
+            ],
         ),
         (
             ("test-topic", 3),
             ("test-topic", 1, "YWRkaXRpb25hbC1kYXRh", None, 1752735960, {}),
-            (
-                {
-                    ("test-topic", 0): 0,
-                    ("test-topic", 1): 1,
-                    ("test-topic", 2): 0,
-                },
+            {
+                ("test-topic", 0): dict(
+                    topic="test-topic", num=0, segments=[dict(base_offset=0)], leo=0
+                ),
+                ("test-topic", 1): dict(
+                    topic="test-topic", num=1, segments=[dict(base_offset=0)], leo=1
+                ),
+                ("test-topic", 2): dict(
+                    topic="test-topic", num=2, segments=[dict(base_offset=0)], leo=0
+                ),
+            },
+            [
+                b"",
                 b"0090"
                 b"{"
                 b'"value":"YWRkaXRpb25hbC1kYXRh",'
@@ -342,28 +357,26 @@ def log_record(base_log_record: Record, request: pytest.FixtureRequest) -> Recor
                 b'"headers":{},'
                 b'"offset":0'
                 b"}",
-            ),
+                b"",
+            ],
         ),
     ],
-    indirect=["initiated_log_storage", "log_record"],
+    indirect=["initiated_log_storage", "log_record", "expected_partitions"],
 )
 def test_append_log(
     initiated_log_storage: FSLogStorage,
     log_record: Record,
     tmp_path: Path,
-    expected: tuple[dict[tuple[str, int], int], bytes],
+    expected_partitions: dict[tuple[str, int], Partition],
+    expected_records: list[bytes],
 ):
     initiated_log_storage.append_log(log_record)
 
-    leo_map, record = expected
-    assert initiated_log_storage.leo_map == leo_map
-    log_file_path = (
-        tmp_path
-        / log_record.partition_dirname
-        / f"{0:0{constants.LOG_FILENAME_LENGTH}d}.log"
-    )
-    with open(log_file_path, "rb") as log_file:
-        assert log_file.read() == record
+    assert initiated_log_storage.partitions == expected_partitions
+    for partition, record in zip(expected_partitions.values(), expected_records):
+        log_file_path = tmp_path / partition.name / partition.active_segment.log
+        with open(log_file_path, "rb") as log_file:
+            assert log_file.read() == record
 
 
 @pytest.mark.parametrize(
@@ -399,19 +412,23 @@ def logged_log_storage(
 
 
 @pytest.mark.parametrize(
-    "logged_log_storage, log_record, expected",
+    "logged_log_storage, log_record, expected_partitions, expected_records",
     [
         (
             ("root-limit_1GB", 1024**3),
             ("topic01", 0, "c2Vjb25kLWxvZw==", None, 1752735962, {}),
-            (
-                {
-                    ("topic01", 0): 2,
-                    ("topic01", 1): 0,
-                },
-                [
-                    (
-                        "topic01-0",
+            {
+                ("topic01", 0): dict(
+                    topic="topic01", num=0, segments=[dict(base_offset=0)], leo=2
+                ),
+                ("topic01", 1): dict(
+                    topic="topic01", num=1, segments=[dict(base_offset=0)], leo=0
+                ),
+            },
+            [
+                (
+                    ("topic01", 0),
+                    [
                         b"0086"
                         b"{"
                         b'"value":"aW5pdGlhbC1sb2c=",'
@@ -428,21 +445,28 @@ def logged_log_storage(
                         b'"headers":{},'
                         b'"offset":1'
                         b"}",
-                    ),
-                ],
-            ),
+                    ],
+                ),
+            ],
         ),
         (
             ("root-limit_100B", 100),
             ("topic01", 1, "c2Vjb25kLWxvZw==", None, 1752735962, {}),
-            (
-                {
-                    ("topic01", 0): 2,
-                    ("topic01", 1): 1,
-                },
-                [
-                    (
-                        "topic01-0",
+            {
+                ("topic01", 0): dict(
+                    topic="topic01",
+                    num=0,
+                    segments=[dict(base_offset=0), dict(base_offset=1)],
+                    leo=2,
+                ),
+                ("topic01", 1): dict(
+                    topic="topic01", num=1, segments=[dict(base_offset=0)], leo=1
+                ),
+            },
+            [
+                (
+                    ("topic01", 0),
+                    [
                         b"0086"
                         b"{"
                         b'"value":"aW5pdGlhbC1sb2c=",'
@@ -451,9 +475,19 @@ def logged_log_storage(
                         b'"headers":{},'
                         b'"offset":0'
                         b"}",
-                    ),
-                    (
-                        "topic01-1",
+                        b"0086"
+                        b"{"
+                        b'"value":"aW5pdGlhbC1sb2c=",'
+                        b'"key":null,'
+                        b'"timestamp":1752735961,'
+                        b'"headers":{},'
+                        b'"offset":1'
+                        b"}",
+                    ],
+                ),
+                (
+                    ("topic01", 1),
+                    [
                         b"0086"
                         b"{"
                         b'"value":"c2Vjb25kLWxvZw==",'
@@ -462,29 +496,29 @@ def logged_log_storage(
                         b'"headers":{},'
                         b'"offset":0'
                         b"}",
-                    ),
-                ],
-            ),
+                    ],
+                ),
+            ],
         ),
     ],
-    indirect=["logged_log_storage", "log_record"],
+    indirect=["logged_log_storage", "log_record", "expected_partitions"],
 )
 def test_append_log_to_already_logged_partition(
     logged_log_storage: FSLogStorage,
     log_record: Record,
     tmp_path: Path,
-    expected: tuple[dict[tuple[str, int], int], list[tuple[str, bytes]]],
+    expected_partitions: dict[tuple[str, int], Partition],
+    expected_records: list[tuple[tuple[str, int], list[bytes]]],
 ):
     logged_log_storage.append_log(log_record)
 
-    leo_map, segment = expected
-    assert logged_log_storage.leo_map == leo_map
-    for partition_dirname, expected_log in segment:
-        log_file_path = (
-            tmp_path / partition_dirname / f"{0:0{constants.LOG_FILENAME_LENGTH}d}.log"
-        )
-        with open(log_file_path, "rb") as log_file:
-            assert log_file.read() == expected_log
+    assert logged_log_storage.partitions == expected_partitions
+    for partition_key, records in expected_records:
+        partition = expected_partitions[partition_key]
+        for segment, record in zip(partition.segments, records):
+            log_file_path = tmp_path / partition.name / segment.log
+            with open(log_file_path, "rb") as log_file:
+                assert log_file.read() == record
 
 
 @pytest.mark.parametrize(

@@ -93,39 +93,28 @@ class FSLogStorage:
             self.init_partition(topic_name=topic_name, partition_num=partition_num)
 
     def append_log(self, record: log.Record) -> None:
-        partition_path = self.root_path / record.partition_dirname
-        if not partition_path.exists():
-            raise PartitionNotFoundError("Partition test-topic-1 does not exist")
-        segment_id = max(int(p.stem) for p in partition_path.glob("*.log"))
-        log_path = (
-            partition_path / f"{segment_id:0{constants.LOG_FILENAME_LENGTH}d}.log"
-        )
-        index_path = (
-            partition_path / f"{segment_id:0{constants.LOG_FILENAME_LENGTH}d}.index"
-        )
-        new_record = record.record_at(self.leo_map[(record.topic, record.partition)])
+        if (partition := self.partitions.get((record.topic, record.partition))) is None:
+            raise PartitionNotFoundError(
+                f"Partition {record.partition_name} does not exist"
+            )
+        partition_path = self.root_path / partition.name
+        log_path = partition_path / partition.active_segment.log
+        index_path = partition_path / partition.active_segment.index
+        new_record = record.record_at(partition.leo)
         new_record_binary = new_record.bin
         current_log_file_size = log_path.stat().st_size + len(new_record_binary)
         if current_log_file_size > self.log_file_size_limit:
-            segment_id += 1
-            log_path = (
-                partition_path / f"{segment_id:0{constants.LOG_FILENAME_LENGTH}d}.log"
-            )
-            index_path = (
-                partition_path / f"{segment_id:0{constants.LOG_FILENAME_LENGTH}d}.index"
-            )
+            partition = partition.roll()
+            log_path = partition_path / partition.active_segment.log
+            index_path = partition_path / partition.active_segment.index
             log_path.touch()
             index_path.touch()
         with log_path.open("ab") as log_file:
+            position = log_file.tell()
             log_file.write(new_record_binary)
         with index_path.open("ab") as index_file:
-            index_file.write(
-                f"{new_record.offset:0{constants.LOG_RECORD_OFFSET_WIDTH}d}"
-                f"{current_log_file_size:0{constants.LOG_RECORD_POSITION_WIDTH}d}".encode(
-                    "utf-8"
-                )
-            )
-        self.leo_map[(record.topic, record.partition)] += 1
+            index_file.write(new_record.index_entry(position))
+        self.partitions[(partition.topic, partition.num)] = partition.commit_record()
 
     def list_segments(self, topic_name: str, partition_num: int) -> list[int]:
         partition_path = self.root_path / f"{topic_name}-{partition_num}"
