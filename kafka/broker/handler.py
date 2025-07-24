@@ -2,12 +2,17 @@ import json
 from collections.abc import Callable
 
 from kafka import message
-from kafka.broker import command, log
+from kafka.broker import command, log, query
 from kafka.broker.storage import FSLogStorage
-from kafka.error import InvalidAdminCommandError, PartitionNotFoundError
+from kafka.error import (
+    InvalidAdminCommandError,
+    PartitionNotFoundError,
+    InvalidOffsetError,
+    ExceedSegmentSizeError,
+)
 
 
-class RequestHandler:
+class CommandHandler:
     def __init__(self, log_storage: FSLogStorage):
         self.log_storage = log_storage
 
@@ -89,6 +94,58 @@ class RequestHandler:
                 "base_offset": -1,
                 "error_message": str(exc),
             }
+        return message.Message(
+            headers=req.headers,
+            payload=json.dumps(result).encode("utf-8"),
+        )
+
+
+class QueryHandler:
+    def __init__(self, log_storage: FSLogStorage):
+        self.log_storage = log_storage
+
+    def handle(self, req: message.Message) -> message.Message:
+        return self._handle_fetch(req)
+
+    def _handle_fetch(self, req: message.Message) -> message.Message:
+        qry = query.Fetch.from_message(req)
+        result = {
+            "topic": qry.topic,
+            "partition": qry.partition,
+            "error_code": 0,
+            "error_message": None,
+            "records": [],
+        }
+        try:
+            records = self.log_storage.list_logs(qry)
+            result["records"] = [
+                r.model_dump(exclude={"topic", "partition"}) for r in records
+            ]
+        except PartitionNotFoundError as exc:
+            result = {
+                "topic": qry.topic,
+                "partition": qry.partition,
+                "error_code": 21,
+                "error_message": str(exc),
+                "records": [],
+            }
+        except (InvalidOffsetError, ExceedSegmentSizeError) as exc:
+            result = {
+                "topic": qry.topic,
+                "partition": qry.partition,
+                "error_code": 20,
+                "error_message": str(exc),
+                "records": [],
+            }
+        except Exception as exc:
+            result = {
+                "topic": qry.topic,
+                "partition": qry.partition,
+                "error_code": -1,
+                "error_message": str(exc),
+                "records": [],
+            }
+            raise exc
         return message.Message(
             headers=req.headers,
             payload=json.dumps(result).encode("utf-8"),
