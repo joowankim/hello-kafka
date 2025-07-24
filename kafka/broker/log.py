@@ -83,3 +83,9 @@ class Partition(pydantic.BaseModel):
     @property
     def active_segment(self) -> Segment:
         return self.segments[-1]
+
+    def roll(self) -> Self:
+        new_segment = Segment(base_offset=self.leo)
+        return self.model_copy(
+            deep=True, update={"segments": self.segments + [new_segment]}
+        )
