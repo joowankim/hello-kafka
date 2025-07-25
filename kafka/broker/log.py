@@ -109,3 +109,22 @@ class Partition(pydantic.BaseModel):
 
     def commit_record(self) -> Self:
         return self.model_copy(deep=True, update={"leo": self.leo + 1})
+
+
+class CommittedOffset(pydantic.BaseModel):
+    group_id: str
+    topic: str
+    partition: int
+    offset: int
+
+    @classmethod
+    def from_offset_commit_command(cls, cmd: command.OffsetCommit) -> list[Self]:
+        return [
+            cls(
+                group_id=cmd.group_id,
+                topic=topic.topic,
+                partition=topic.partition,
+                offset=topic.offset,
+            )
+            for topic in cmd.topics
+        ]
