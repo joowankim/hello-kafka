@@ -1,6 +1,13 @@
 import pytest
 
-from kafka.broker.command import CreateTopics, CreateTopic, Produce, RecordContents
+from kafka.broker.command import (
+    CreateTopics,
+    CreateTopic,
+    Produce,
+    RecordContents,
+    TopicOffset,
+    OffsetCommit,
+)
 
 
 @pytest.fixture
@@ -19,7 +26,7 @@ def base_create_topics(base_create_topic: CreateTopic) -> CreateTopics:
 @pytest.fixture
 def base_record_contents() -> RecordContents:
     return RecordContents(
-        value=b"test-value",
+        value="test-value",
         key=None,
         timestamp=None,
         headers={},
@@ -32,4 +39,21 @@ def base_produce(base_record_contents: RecordContents) -> Produce:
         topic="test-topic",
         partition=0,
         records=[base_record_contents.model_copy()],
+    )
+
+
+@pytest.fixture
+def base_topic_offset() -> TopicOffset:
+    return TopicOffset(
+        topic="test-topic",
+        partition=0,
+        offset=100,
+    )
+
+
+@pytest.fixture
+def base_offset_commit(base_topic_offset: TopicOffset) -> OffsetCommit:
+    return OffsetCommit(
+        group_id="test-group",
+        topics=[base_topic_offset.model_copy()],
     )

@@ -54,3 +54,20 @@ class Produce(pydantic.BaseModel):
                 record["timestamp"] = int(time.time())
             params["records"][idx] = record
         return cls.model_validate(params)
+
+
+class TopicOffset(pydantic.BaseModel):
+    topic: str
+    partition: int
+    offset: int
+
+
+class OffsetCommit(pydantic.BaseModel):
+    group_id: str
+    topics: list[TopicOffset] = Field(min_length=1)
+
+    @classmethod
+    def from_message(cls, msg: message.Message) -> Self:
+        if msg.headers.api_key != message.MessageType.OFFSET_COMMIT:
+            raise ValueError("Message is not of type OFFSET_COMMIT")
+        return cls.model_validate_json(msg.payload.decode("utf-8"))
