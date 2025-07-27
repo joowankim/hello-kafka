@@ -34,7 +34,7 @@ Apache Kafka의 핵심 동작 원리를 학습하기 위해 Python으로 직접 
 
 ```bash
 # 1. 저장소 클론
-git clone <repo-url>
+https://github.com/joowankim/hello-kafka.git
 cd hello-kafka
 
 # 2. 브로커 실행
