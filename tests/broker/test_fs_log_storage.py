@@ -592,3 +592,27 @@ def test_list_logs(
     records = logged_log_storage.list_logs(qry)
 
     assert records == expected
+
+
+@pytest.mark.parametrize(
+    "logged_log_storage, expected",
+    [
+        (
+            ("root-empty", 1024**3),
+            [],
+        ),
+        (
+            ("root-limit_1GB", 1024**3),
+            ["topic01"],
+        ),
+        (
+            ("root-limit_100B", 100),
+            ["topic01"],
+        ),
+    ],
+    indirect=["logged_log_storage"],
+)
+def test_list_topics(logged_log_storage: FSLogStorage, expected: list[str]):
+    topics = logged_log_storage.list_topics()
+
+    assert topics == expected
