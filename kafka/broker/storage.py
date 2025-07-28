@@ -204,5 +204,10 @@ class FSCommittedOffsetStorage:
         self.cache[key] = committed_offset.offset
 
     def commit(self) -> None:
-        """cache 내용을 `.chk` 파일에 저장"""
-        ...
+        chk_file_path = self.root_path / constants.COMMITTED_OFFSET_FILE_NAME
+        persisted_cache = {
+            f"{group_id}{self.key_delimiter}{topic}{self.key_delimiter}{partition}": offset
+            for (group_id, topic, partition), offset in self.cache.items()
+        }
+        with chk_file_path.open("w") as chk_file:
+            json.dump(persisted_cache, chk_file, ensure_ascii=True)

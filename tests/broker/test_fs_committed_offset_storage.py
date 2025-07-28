@@ -3,6 +3,7 @@ from pathlib import Path
 
 import pytest
 
+from kafka import constants
 from kafka.broker.log import CommittedOffset
 from kafka.broker.storage import FSCommittedOffsetStorage
 
@@ -81,3 +82,34 @@ def test_update(
     fs_committed_offset_storage.update(committed_offset)
 
     assert fs_committed_offset_storage.cache == expected
+
+
+@pytest.mark.parametrize(
+    "fs_committed_offset_storage, committed_offset, expected",
+    [
+        (
+            "root-limit_1GB",
+            dict(group_id="default-group", topic="topic01", partition=0, offset=3),
+            b'{"default-group:topic01:0": 3}',
+        ),
+        (
+            "root-limit_100B",
+            dict(group_id="default-group", topic="topic01", partition=0, offset=2),
+            b'{"default-group:topic01:0": 2}',
+        ),
+    ],
+    indirect=["fs_committed_offset_storage", "committed_offset"],
+)
+def test_commit(
+    fs_committed_offset_storage: FSCommittedOffsetStorage,
+    committed_offset: CommittedOffset,
+    expected: bytes,
+):
+    fs_committed_offset_storage.update(committed_offset)
+    fs_committed_offset_storage.commit()
+
+    chk_file_path = (
+        fs_committed_offset_storage.root_path / constants.COMMITTED_OFFSET_FILE_NAME
+    )
+    with chk_file_path.open("rb") as f:
+        assert f.read() == expected
