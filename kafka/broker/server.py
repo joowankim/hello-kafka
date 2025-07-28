@@ -11,12 +11,16 @@ async def handle_client(
     log_storage = storage.FSLogStorage.load_from_root(
         Path("tmp"), constants.LOG_FILE_SIZE_LIMIT
     )
+    committed_offset_storage = storage.FSCommittedOffsetStorage.load_from_root(
+        Path("tmp")
+    )
     message_parser = parser.MessageParser(reader)
-    command_handler = handler.CommandHandler(log_storage)
+    command_handler = handler.CommandHandler(log_storage, committed_offset_storage)
     query_handler = handler.QueryHandler(log_storage)
     handlers = {
         message.MessageType.CREATE_TOPICS: command_handler,
         message.MessageType.PRODUCE: command_handler,
+        message.MessageType.OFFSET_COMMIT: command_handler,
         message.MessageType.FETCH: query_handler,
     }
     try:

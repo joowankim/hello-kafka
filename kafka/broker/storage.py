@@ -1,3 +1,4 @@
+import json
 import re
 from pathlib import Path
 from typing import Self, ClassVar
@@ -161,3 +162,52 @@ class FSLogStorage:
                         total_record_size += record.size
 
         return result
+
+
+class FSCommittedOffsetStorage:
+    key_delimiter: ClassVar[str] = ":"
+
+    def __init__(self, root_path: Path, cache: dict[tuple[str, str, int], int]):
+        self.root_path = root_path
+        self.cache: dict[tuple[str, str, int], int] = cache
+
+    @classmethod
+    def load_from_root(cls, root_path: Path) -> Self:
+        chk_file_path = root_path / constants.COMMITTED_OFFSET_FILE_NAME
+        if not chk_file_path.exists():
+            cache = {}
+            chk_file_path.touch()
+            with chk_file_path.open("wb") as chk_file:
+                chk_file.write(json.dumps(cache).encode("utf-8"))
+            return cls(root_path=root_path, cache=cache)
+        with chk_file_path.open("rb") as chk_file:
+            data = json.loads(chk_file.read().decode("utf-8"))
+            cache = {}
+            for key, value in data.items():
+                group_id, topic, partition = key.split(cls.key_delimiter)
+                cache[(group_id, topic, int(partition))] = int(value)
+        return cls(root_path=root_path, cache=cache)
+
+    def update(self, committed_offset: log.CommittedOffset) -> None:
+        key = (
+            committed_offset.group_id,
+            committed_offset.topic,
+            committed_offset.partition,
+        )
+        if (
+            self.cache.get(key) is not None
+            and self.cache[key] >= committed_offset.offset
+        ):
+            raise InvalidAdminCommandError(
+                f"Offset {committed_offset.offset} is not greater than the current offset {self.cache[key]} for {key}"
+            )
+        self.cache[key] = committed_offset.offset
+
+    def commit(self) -> None:
+        chk_file_path = self.root_path / constants.COMMITTED_OFFSET_FILE_NAME
+        persisted_cache = {
+            f"{group_id}{self.key_delimiter}{topic}{self.key_delimiter}{partition}": offset
+            for (group_id, topic, partition), offset in self.cache.items()
+        }
+        with chk_file_path.open("w") as chk_file:
+            json.dump(persisted_cache, chk_file, ensure_ascii=True)
