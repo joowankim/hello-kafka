@@ -189,8 +189,19 @@ class FSCommittedOffsetStorage:
         return cls(root_path=root_path, cache=cache)
 
     def update(self, committed_offset: log.CommittedOffset) -> None:
-        """cache에 committed offset 추가 및 수정"""
-        ...
+        key = (
+            committed_offset.group_id,
+            committed_offset.topic,
+            committed_offset.partition,
+        )
+        if (
+            self.cache.get(key) is not None
+            and self.cache[key] >= committed_offset.offset
+        ):
+            raise InvalidAdminCommandError(
+                f"Offset {committed_offset.offset} is not greater than the current offset {self.cache[key]} for {key}"
+            )
+        self.cache[key] = committed_offset.offset
 
     def commit(self) -> None:
         """cache 내용을 `.chk` 파일에 저장"""

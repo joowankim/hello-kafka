@@ -1,6 +1,6 @@
 import pytest
 
-from kafka.broker.log import Record, Partition, Segment
+from kafka.broker.log import Record, Partition, Segment, CommittedOffset
 
 
 @pytest.fixture
@@ -28,5 +28,14 @@ def base_partition(base_segment: Segment) -> Partition:
         num=0,
         segments=[base_segment.model_copy()],
         leo=0,
-        segment_size_limit=1000,
+    )
+
+
+@pytest.fixture
+def base_committed_offset() -> CommittedOffset:
+    return CommittedOffset(
+        group_id="test-group",
+        topic="test-topic",
+        partition=0,
+        offset=100,
     )
