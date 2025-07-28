@@ -22,6 +22,7 @@ async def handle_client(
         message.MessageType.PRODUCE: command_handler,
         message.MessageType.OFFSET_COMMIT: command_handler,
         message.MessageType.FETCH: query_handler,
+        message.MessageType.LIST_TOPICS: query_handler,
     }
     try:
         async for msg in message_parser:
