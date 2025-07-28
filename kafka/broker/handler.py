@@ -3,7 +3,7 @@ from collections.abc import Callable
 
 from kafka import message
 from kafka.broker import command, log, query
-from kafka.broker.storage import FSLogStorage
+from kafka.broker.storage import FSLogStorage, FSCommittedOffsetStorage
 from kafka.error import (
     InvalidAdminCommandError,
     PartitionNotFoundError,
@@ -13,8 +13,13 @@ from kafka.error import (
 
 
 class CommandHandler:
-    def __init__(self, log_storage: FSLogStorage):
+    def __init__(
+        self,
+        log_storage: FSLogStorage,
+        committed_offset_storage: FSCommittedOffsetStorage,
+    ):
         self.log_storage = log_storage
+        self.committed_offset_storage = committed_offset_storage
 
     def handle(self, req: message.Message) -> message.Message:
         handlers: dict[
@@ -22,6 +27,7 @@ class CommandHandler:
         ] = {
             message.MessageType.CREATE_TOPICS: self._handle_create_topics,
             message.MessageType.PRODUCE: self._handle_produce,
+            message.MessageType.OFFSET_COMMIT: self._handle_offset_commit,
         }
         return handlers[req.headers.api_key](req)
 
@@ -97,6 +103,41 @@ class CommandHandler:
         return message.Message(
             headers=req.headers,
             payload=json.dumps(result).encode("utf-8"),
+        )
+
+    def _handle_offset_commit(self, req: message.Message) -> message.Message:
+        cmd = command.OffsetCommit.from_message(req)
+        committed_offsets = log.CommittedOffset.from_offset_commit_command(cmd)
+        results = []
+        for committed_offset in committed_offsets:
+            try:
+                self.committed_offset_storage.update(committed_offset)
+                self.committed_offset_storage.commit()
+                result = {
+                    "topic": committed_offset.topic,
+                    "partition": committed_offset.partition,
+                    "error_code": 0,
+                    "error_message": None,
+                }
+            except PartitionNotFoundError as exc:
+                result = {
+                    "topic": committed_offset.topic,
+                    "partition": committed_offset.partition,
+                    "error_code": 21,
+                    "error_message": str(exc),
+                }
+            except Exception as exc:
+                result = {
+                    "topic": committed_offset.topic,
+                    "partition": committed_offset.partition,
+                    "error_code": -1,
+                    "error_message": str(exc),
+                }
+            finally:
+                results.append(result)
+        return message.Message(
+            headers=req.headers,
+            payload=json.dumps({"topics": results}).encode("utf-8"),
         )
 
 
