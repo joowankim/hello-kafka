@@ -146,7 +146,13 @@ class QueryHandler:
         self.log_storage = log_storage
 
     def handle(self, req: message.Message) -> message.Message:
-        return self._handle_fetch(req)
+        handlers: dict[
+            message.MessageType, Callable[[message.Message], message.Message]
+        ] = {
+            message.MessageType.FETCH: self._handle_fetch,
+            message.MessageType.LIST_TOPICS: self._handle_list_topics,
+        }
+        return handlers[req.headers.api_key](req)
 
     def _handle_fetch(self, req: message.Message) -> message.Message:
         qry = query.Fetch.from_message(req)
@@ -186,6 +192,18 @@ class QueryHandler:
                 "error_message": str(exc),
                 "records": [],
             }
+        return message.Message(
+            headers=req.headers,
+            payload=json.dumps(result).encode("utf-8"),
+        )
+
+    def _handle_list_topics(self, req: message.Message) -> message.Message:
+        topics = self.log_storage.list_topics()
+        result = {
+            "topics": topics,
+            "error_code": 0,
+            "error_message": None,
+        }
         return message.Message(
             headers=req.headers,
             payload=json.dumps(result).encode("utf-8"),

@@ -163,6 +163,9 @@ class FSLogStorage:
 
         return result
 
+    def list_topics(self) -> list[str]:
+        return list({topic for topic, _ in self.partitions.keys()})
+
 
 class FSCommittedOffsetStorage:
     key_delimiter: ClassVar[str] = ":"

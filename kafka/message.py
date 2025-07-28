@@ -13,6 +13,7 @@ class MessageType(enum.IntEnum):
     PRODUCE = 1
     FETCH = 2
     OFFSET_COMMIT = 3
+    LIST_TOPICS = 4
 
 
 class MessageHeaders(BaseModel):
