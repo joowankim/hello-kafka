@@ -1,4 +1,3 @@
-import functools
 from collections.abc import Callable
 
 from kafka import message
@@ -12,23 +11,11 @@ class Router:
         ] = {}
 
     def register(
-        self, msg_type: message.MessageType
-    ) -> Callable[
-        [Callable[[message.Message], message.Message]],
-        Callable[[message.Message], message.Message],
-    ]:
-        def decorator(
-            handler: Callable[[message.Message], message.Message],
-        ) -> Callable[[message.Message], message.Message]:
-            self._handlers[msg_type] = handler
-
-            @functools.wraps(handler)
-            def wrapper(req: message.Message) -> message.Message:
-                return handler(req)
-
-            return wrapper
-
-        return decorator
+        self,
+        msg_type: message.MessageType,
+        handler: Callable[[message.Message], message.Message],
+    ) -> None:
+        self._handlers[msg_type] = handler
 
     def route(self, req: message.Message) -> message.Message:
         if (handler := self._handlers.get(req.headers.api_key)) is None:

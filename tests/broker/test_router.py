@@ -73,8 +73,8 @@ def test_router_register_and_route(router: Router, message: Message, expected: M
     def handler_b(req: Message) -> Message:
         return req.model_copy(update={"payload": b"{'status': 'failure'}"})
 
-    router.register(MessageType.FETCH)(handler_a)
-    router.register(MessageType.CREATE_TOPICS)(handler_b)
+    router.register(MessageType.FETCH, handler_a)
+    router.register(MessageType.CREATE_TOPICS, handler_b)
 
     response = router.route(message)
 

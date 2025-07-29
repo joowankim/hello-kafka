@@ -1,9 +1,7 @@
 import json
-from pathlib import Path
 
-from kafka import message, constants
+from kafka import message
 from kafka.broker import command, log, query, storage
-from kafka.broker.router import Router
 from kafka.error import (
     InvalidAdminCommandError,
     PartitionNotFoundError,
@@ -11,15 +9,10 @@ from kafka.error import (
     ExceedSegmentSizeError,
 )
 
-router = Router()
-log_storage = storage.FSLogStorage.load_from_root(
-    Path("tmp"), constants.LOG_FILE_SIZE_LIMIT
-)
-committed_offset_storage = storage.FSCommittedOffsetStorage.load_from_root(Path("tmp"))
 
-
-@router.register(message.MessageType.CREATE_TOPICS)
-def create_topics(req: message.Message) -> message.Message:
+def create_topics(
+    req: message.Message, log_storage: storage.FSLogStorage
+) -> message.Message:
     cmd = command.CreateTopics.from_message(req)
     results = []
     for topic in cmd.topics:
@@ -58,8 +51,7 @@ def create_topics(req: message.Message) -> message.Message:
     )
 
 
-@router.register(message.MessageType.PRODUCE)
-def produce(req: message.Message) -> message.Message:
+def produce(req: message.Message, log_storage: storage.FSLogStorage) -> message.Message:
     cmd = command.Produce.from_message(req)
     records = log.Record.from_produce_command(cmd)
     result = {
@@ -96,8 +88,9 @@ def produce(req: message.Message) -> message.Message:
     )
 
 
-@router.register(message.MessageType.OFFSET_COMMIT)
-def offset_commit(req: message.Message) -> message.Message:
+def offset_commit(
+    req: message.Message, committed_offset_storage: storage.FSCommittedOffsetStorage
+) -> message.Message:
     cmd = command.OffsetCommit.from_message(req)
     committed_offsets = log.CommittedOffset.from_offset_commit_command(cmd)
     results = []
@@ -133,8 +126,7 @@ def offset_commit(req: message.Message) -> message.Message:
     )
 
 
-@router.register(message.MessageType.FETCH)
-def fetch(req: message.Message) -> message.Message:
+def fetch(req: message.Message, log_storage: storage.FSLogStorage) -> message.Message:
     qry = query.Fetch.from_message(req)
     result = {
         "topic": qry.topic,
@@ -178,8 +170,9 @@ def fetch(req: message.Message) -> message.Message:
     )
 
 
-@router.register(message.MessageType.LIST_TOPICS)
-def list_topics(req: message.Message) -> message.Message:
+def list_topics(
+    req: message.Message, log_storage: storage.FSLogStorage
+) -> message.Message:
     topics = log_storage.list_topics()
     result = {
         "topics": topics,
