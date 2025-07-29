@@ -44,3 +44,9 @@ class ExceedSegmentSizeError(NonRetriableError):
     """세그먼트 크기를 초과하는 경우 발생하는 예외"""
 
     pass
+
+
+class UnknownMessageTypeError(NonRetriableError):
+    """알 수 없는 메시지 타입에 대한 예외"""
+
+    pass
