@@ -1,12 +1,12 @@
 from pathlib import Path
-from kafka import constants, message
+from kafka import constants, message, parser
 from kafka.broker.router import Router
 from kafka.broker import handler
 
 import asyncio
 import functools
 
-from kafka.broker import parser, storage
+from kafka.broker import storage
 
 
 async def handle_client(

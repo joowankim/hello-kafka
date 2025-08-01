@@ -4,7 +4,7 @@ from typing import Any
 
 import pytest
 
-from kafka.broker.parser import MessageParser
+from kafka.parser import MessageParser
 from kafka.message import Message, MessageHeaders, MessageType
 
 
