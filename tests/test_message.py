@@ -1,7 +1,7 @@
 import pytest
 
 from kafka.error import SerializationError
-from kafka.message import Message, MessageHeaders
+from kafka.message import Message, MessageHeaders, MessageType
 
 
 @pytest.fixture
@@ -89,3 +89,33 @@ def test_deserialize(serialized: bytes, message: Message):
 def test_deserialize_invalid_bytes(serialized: bytes, error_message: str):
     with pytest.raises(SerializationError, match=error_message):
         Message.deserialize(serialized)
+
+
+@pytest.mark.parametrize(
+    "correlation_id, payload, message",
+    [
+        (
+            1,
+            b'{"topics": [{"name": "topic-1", "num_partitions": 3}]}',
+            (
+                1,
+                MessageType.CREATE_TOPICS,
+                b'{"topics": [{"name": "topic-1", "num_partitions": 3}]}',
+            ),
+        ),
+        (
+            2,
+            b'{"topics": [{"name": "topic-2", "num_partitions": 5}]}',
+            (
+                2,
+                MessageType.CREATE_TOPICS,
+                b'{"topics": [{"name": "topic-2", "num_partitions": 5}]}',
+            ),
+        ),
+    ],
+    ids=["create_topic_1", "create_topic_2"],
+)
+def test_create_topics(correlation_id: int, payload: bytes, message: Message):
+    msg = Message.create_topics(correlation_id=correlation_id, payload=payload)
+
+    assert msg == message
