@@ -53,5 +53,3 @@ class BrokerConnection:
         traceback: TracebackType | None,
     ) -> None:
         await self.close()
-        if exc_type is not None:
-            raise exc_value
