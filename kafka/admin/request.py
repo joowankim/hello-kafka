@@ -1,3 +1,4 @@
+import json
 from typing import Self, Any
 
 import pydantic
@@ -27,3 +28,12 @@ class NewTopicList(list[NewTopic]):
         if len(seen) != len(v):
             raise ValueError("New topics must not have duplicated names")
         return v
+
+    @property
+    def payload(self) -> bytes:
+        content = {
+            "topics": [
+                topic.model_dump(exclude={"replication_factor"}) for topic in self
+            ]
+        }
+        return json.dumps(content).encode("utf-8")

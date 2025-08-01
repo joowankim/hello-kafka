@@ -48,3 +48,26 @@ def test_validation_with_duplicated_topics(new_topics: NewTopicList):
         ValidationError, match="New topics must not have duplicated names"
     ):
         TypeAdapter(NewTopicList).validate_python(new_topics)
+
+
+@pytest.mark.parametrize(
+    "new_topics, expected",
+    [
+        (
+            [dict(name="topic-1", num_partitions=3, replication_factor=1)],
+            b'{"topics": [{"name": "topic-1", "num_partitions": 3}]}',
+        ),
+        (
+            [
+                dict(name="topic-1", num_partitions=3, replication_factor=2),
+                dict(name="topic-2", num_partitions=5, replication_factor=3),
+            ],
+            b'{"topics": [{"name": "topic-1", "num_partitions": 3}, {"name": "topic-2", "num_partitions": 5}]}',
+        ),
+    ],
+    indirect=["new_topics"],
+)
+def test_payload(new_topics: NewTopicList, expected: bytes):
+    payload = new_topics.payload
+
+    assert payload == expected
