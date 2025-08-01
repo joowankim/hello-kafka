@@ -113,7 +113,7 @@ def test_deserialize_invalid_bytes(serialized: bytes, error_message: str):
             ),
         ),
     ],
-    ids=["create_topic_1", "create_topic_2"],
+    indirect=["message"],
 )
 def test_create_topics(correlation_id: int, payload: bytes, message: Message):
     msg = Message.create_topics(correlation_id=correlation_id, payload=payload)
