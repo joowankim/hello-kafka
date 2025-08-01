@@ -50,3 +50,9 @@ class UnknownMessageTypeError(NonRetriableError):
     """알 수 없는 메시지 타입에 대한 예외"""
 
     pass
+
+
+class BrokerConnectionError(NonRetriableError):
+    """연결 관련 예외"""
+
+    pass
