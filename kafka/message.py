@@ -20,6 +20,13 @@ class MessageHeaders(BaseModel):
     correlation_id: int
     api_key: MessageType
 
+    @classmethod
+    def create_topics(cls, correlation_id: int) -> Self:
+        return cls(
+            correlation_id=correlation_id,
+            api_key=MessageType.CREATE_TOPICS,
+        )
+
 
 class Message(BaseModel):
     headers: MessageHeaders
@@ -62,3 +69,8 @@ class Message(BaseModel):
             ),
             payload=payload.encode("utf-8"),
         )
+
+    @classmethod
+    def create_topics(cls, correlation_id: int, payload: bytes) -> Self:
+        headers = MessageHeaders.create_topics(correlation_id)
+        return cls(headers=headers, payload=payload)
