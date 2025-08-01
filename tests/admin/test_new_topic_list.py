@@ -3,7 +3,7 @@ from typing import Any
 import pytest
 from pydantic import TypeAdapter, ValidationError
 
-from kafka.client.request import NewTopicList, NewTopic
+from kafka.admin.request import NewTopicList, NewTopic
 
 
 @pytest.fixture

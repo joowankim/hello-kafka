@@ -1,6 +1,6 @@
 import pytest
 
-from kafka.client.request import NewTopic
+from kafka.admin.request import NewTopic
 
 
 @pytest.fixture
