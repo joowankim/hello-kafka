@@ -56,3 +56,9 @@ class BrokerConnectionError(NonRetriableError):
     """연결 관련 예외"""
 
     pass
+
+
+class InvalidCorrelationIdError(NonRetriableError):
+    """잘못된 상관 관계 ID에 대한 예외"""
+
+    pass

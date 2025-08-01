@@ -40,7 +40,7 @@ class BrokerConnection:
     async def read(self, n: int) -> bytes:
         if not self.is_connected:
             raise BrokerConnectionError("Connection not established")
-        return await self._reader.readexactly(n)
+        return await self._reader.read(n)
 
     async def __aenter__(self) -> Self:
         await self.connect()
