@@ -11,12 +11,18 @@ class MessageParser:
     async def __aiter__(self) -> AsyncIterator[message.Message]:
         while True:
             try:
-                headers_data = await self.reader.read(constants.HEADER_WIDTH)
-                if not headers_data:
+                msg = await self.parse()
+                if msg is None:
                     break
-                headers = headers_data.decode("utf-8")
-                payload_length = int(headers[-constants.PAYLOAD_LENGTH_WIDTH :])
-                payload_data = await self.reader.read(payload_length)
-                yield message.Message.deserialize(headers_data + payload_data)
-            except asyncio.IncompleteReadError:
+                yield msg
+            except (asyncio.IncompleteReadError, StopIteration):
                 break
+
+    async def parse(self) -> message.Message | None:
+        headers_data = await self.reader.read(constants.HEADER_WIDTH)
+        if not headers_data:
+            return None
+        headers = headers_data.decode("utf-8")
+        payload_length = int(headers[-constants.PAYLOAD_LENGTH_WIDTH :])
+        payload_data = await self.reader.read(payload_length)
+        return message.Message.deserialize(headers_data + payload_data)
