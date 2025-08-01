@@ -44,12 +44,12 @@ async def test_close_unconnected() -> None:
 
 
 @pytest.mark.asyncio
-async def test_send_and_receive(broker: tuple[str, int]) -> None:
+async def test_send_and_read(broker: tuple[str, int]) -> None:
     host, port = broker
     async with BrokerConnection(host, port) as conn:
         data = b"test data"
         await conn.send(data)
-        resp = await conn.recv(len(data))
+        resp = await conn.read(len(data))
     assert resp == b"test data"
 
 

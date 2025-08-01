@@ -37,7 +37,7 @@ class BrokerConnection:
         self._writer.write(data)
         await self._writer.drain()
 
-    async def recv(self, n: int) -> bytes:
+    async def read(self, n: int) -> bytes:
         if not self.is_connected:
             raise BrokerConnectionError("Connection not established")
         return await self._reader.readexactly(n)

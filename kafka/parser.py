@@ -1,11 +1,18 @@
 import asyncio
 from collections.abc import AsyncIterator
+from typing import Protocol
 
 from kafka import message, constants
 
 
+class Reader(Protocol):
+    async def read(self, n: int) -> bytes:
+        """Read n bytes from the stream."""
+        pass
+
+
 class MessageParser:
-    def __init__(self, reader: asyncio.StreamReader):
+    def __init__(self, reader: Reader):
         self.reader = reader
 
     async def __aiter__(self) -> AsyncIterator[message.Message]:
