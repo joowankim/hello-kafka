@@ -49,3 +49,32 @@ async def test_dispatch_success(dispatcher: ResponseDispatcher):
 async def test_dispatch_invalid_correlation_id(dispatcher: ResponseDispatcher):
     with pytest.raises(InvalidCorrelationIdError):
         await dispatcher.dispatch()
+
+
+@pytest.mark.parametrize(
+    "dispatcher",
+    [b""],
+    indirect=True,
+)
+def test_link_success(dispatcher: ResponseDispatcher):
+    correlation_id = 1
+    future = asyncio.Future()
+
+    dispatcher.link(correlation_id=correlation_id, future=future)
+
+    assert correlation_id in dispatcher._pending_requests
+    assert dispatcher._pending_requests[correlation_id] is future
+
+
+@pytest.mark.parametrize(
+    "dispatcher",
+    [b""],
+    indirect=True,
+)
+def test_link_duplicate_correlation_id(dispatcher: ResponseDispatcher):
+    correlation_id = 1
+    future = asyncio.Future()
+    dispatcher.link(correlation_id=correlation_id, future=future)
+
+    with pytest.raises(InvalidCorrelationIdError):
+        dispatcher.link(correlation_id=correlation_id, future=future)

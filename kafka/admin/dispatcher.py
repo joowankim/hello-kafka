@@ -23,3 +23,8 @@ class ResponseDispatcher:
             )
         future = self._pending_requests.pop(correlation_id)
         future.set_result(resp.payload)
+
+    def link(self, correlation_id: int, future: asyncio.Future[bytes]) -> None:
+        if correlation_id in self._pending_requests:
+            raise InvalidCorrelationIdError("already linked correlation id")
+        self._pending_requests[correlation_id] = future
