@@ -43,7 +43,7 @@ class Message(BaseModel):
         rf"^(?P<correlation_id>\d{{{constants.CORRELATION_ID_WIDTH}}})"
         rf"(?P<api_key>\d{{{constants.API_KEY_WIDTH}}})"
         rf"(?P<payload_length>\d{{{constants.PAYLOAD_LENGTH_WIDTH}}})"
-        r"(?P<payload>{.*})"
+        r"(?P<payload>.*)"
     )
 
     @property

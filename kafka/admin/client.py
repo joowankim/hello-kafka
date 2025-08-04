@@ -35,10 +35,12 @@ class AdminClient:
             while True:
                 await self._dispatcher.dispatch()
 
-    async def run_loop(self) -> None:
-        asyncio.create_task(self.loop())
+    def run_loop(self) -> asyncio.Task:
+        return asyncio.create_task(self.loop())
 
-    async def create_topics(self, new_topics: request.NewTopicList) -> asyncio.Future:
+    async def create_topics(
+        self, new_topics: request.NewTopicList
+    ) -> asyncio.Future[bytes]:
         if not self.is_connected:
             raise connection.BrokerConnectionError("Not connected to broker")
         new_correlation_id = self.correlation_id_factory()
@@ -46,6 +48,17 @@ class AdminClient:
         msg = message.Message.create_topics(
             correlation_id=new_correlation_id, payload=new_topics.payload
         )
+        self._dispatcher.link(correlation_id=new_correlation_id, future=future)
+        await self._conn.send(msg.serialized)
+
+        return future
+
+    async def list_topics(self) -> asyncio.Future[bytes]:
+        if not self.is_connected:
+            raise connection.BrokerConnectionError("Not connected to broker")
+        new_correlation_id = self.correlation_id_factory()
+        future = asyncio.Future()
+        msg = message.Message.list_topics(new_correlation_id)
         self._dispatcher.link(correlation_id=new_correlation_id, future=future)
         await self._conn.send(msg.serialized)
 
