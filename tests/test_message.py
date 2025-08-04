@@ -119,3 +119,23 @@ def test_create_topics(correlation_id: int, payload: bytes, message: Message):
     msg = Message.create_topics(correlation_id=correlation_id, payload=payload)
 
     assert msg == message
+
+
+@pytest.mark.parametrize(
+    "correlation_id, message",
+    [
+        (
+            1,
+            (1, MessageType.LIST_TOPICS, b""),
+        ),
+        (
+            2,
+            (2, MessageType.LIST_TOPICS, b""),
+        ),
+    ],
+    indirect=["message"],
+)
+def test_list_topics(correlation_id: int, message: Message):
+    msg = Message.list_topics(correlation_id=correlation_id)
+
+    assert msg == message
