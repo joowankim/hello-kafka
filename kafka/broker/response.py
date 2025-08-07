@@ -1,3 +1,4 @@
+import time
 from typing import Self
 
 import pydantic
@@ -7,6 +8,7 @@ class ProduceResponse(pydantic.BaseModel):
     topic: str
     partition: int
     base_offset: int
+    timestamp: int
     error_code: int
     error_message: str | None = None
 
@@ -20,6 +22,7 @@ class ProduceResponse(pydantic.BaseModel):
             topic=topic,
             partition=partition,
             base_offset=base_offset,
+            timestamp=int(time.time()),
             error_code=0,
             error_message=None,
         )
@@ -36,6 +39,7 @@ class ProduceResponse(pydantic.BaseModel):
             topic=topic,
             partition=partition,
             base_offset=-1,
+            timestamp=int(time.time()),
             error_code=error_code,
             error_message=error_message,
         )

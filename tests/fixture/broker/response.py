@@ -9,6 +9,7 @@ def base_produce_response() -> ProduceResponse:
         topic="test-topic",
         partition=0,
         base_offset=0,
+        timestamp=1754556963,
         error_code=0,
         error_message=None,
     )

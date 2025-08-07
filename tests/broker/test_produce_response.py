@@ -1,4 +1,5 @@
 from typing import Any
+from unittest import mock
 
 
 import pytest
@@ -21,13 +22,25 @@ def expected(
             "test_topic",
             0,
             100,
-            dict(topic="test_topic", partition=0, error_code=0, base_offset=100),
+            dict(
+                topic="test_topic",
+                partition=0,
+                error_code=0,
+                base_offset=100,
+                timestamp=1754556963,
+            ),
         ),
         (
             "another_topic",
             1,
             200,
-            dict(topic="another_topic", partition=1, error_code=0, base_offset=200),
+            dict(
+                topic="another_topic",
+                partition=1,
+                error_code=0,
+                base_offset=200,
+                timestamp=1754556963,
+            ),
         ),
     ],
     indirect=["expected"],
@@ -35,11 +48,12 @@ def expected(
 def test_success(
     topic: str, partition: int, base_offset: int, expected: ProduceResponse
 ):
-    resp = ProduceResponse.success(
-        topic=topic, partition=partition, base_offset=base_offset
-    )
+    with mock.patch("time.time", return_value=1754556963):
+        resp = ProduceResponse.success(
+            topic=topic, partition=partition, base_offset=base_offset
+        )
 
-    assert resp == expected
+        assert resp == expected
 
 
 @pytest.mark.parametrize(
@@ -54,6 +68,7 @@ def test_success(
                 topic="test_topic",
                 partition=0,
                 base_offset=-1,
+                timestamp=1754556963,
                 error_code=1,
                 error_message="Error occurred",
             ),
@@ -67,6 +82,7 @@ def test_success(
                 topic="another_topic",
                 partition=1,
                 base_offset=-1,
+                timestamp=1754556963,
                 error_code=2,
                 error_message="Another error",
             ),
@@ -81,35 +97,38 @@ def test_failure(
     error_message: str,
     expected: ProduceResponse,
 ):
-    resp = ProduceResponse.failure(
-        topic=topic,
-        partition=partition,
-        error_code=error_code,
-        error_message=error_message,
-    )
+    with mock.patch("time.time", return_value=1754556963):
+        resp = ProduceResponse.failure(
+            topic=topic,
+            partition=partition,
+            error_code=error_code,
+            error_message=error_message,
+        )
 
-    assert resp == expected
+        assert resp == expected
 
 
 @pytest.mark.parametrize(
     "payload, expected",
     [
         (
-            b'{"topic":"test_topic","partition":0,"base_offset":100,"error_code":0,"error_message":null}',
+            b'{"topic":"test_topic","partition":0,"base_offset":100,"timestamp":1754556963,"error_code":0,"error_message":null}',
             dict(
                 topic="test_topic",
                 partition=0,
                 base_offset=100,
+                timestamp=1754556963,
                 error_code=0,
                 error_message=None,
             ),
         ),
         (
-            b'{"topic":"another_topic","partition":1,"base_offset":200,"error_code":0,"error_message":null}',
+            b'{"topic":"another_topic","partition":1,"base_offset":200,"timestamp":1754556963,"error_code":0,"error_message":null}',
             dict(
                 topic="another_topic",
                 partition=1,
                 base_offset=200,
+                timestamp=1754556963,
                 error_code=0,
                 error_message=None,
             ),
