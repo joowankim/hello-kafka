@@ -42,6 +42,10 @@ class Produce(pydantic.BaseModel):
     partition: int
     records: list[RecordContents] = Field(min_length=1)
 
+    @property
+    def serialized(self) -> bytes:
+        return json.dumps(self.model_dump(mode="json")).encode("utf-8")
+
     @classmethod
     def from_message(cls, msg: message.Message) -> Self:
         if msg.headers.api_key != message.MessageType.PRODUCE:
