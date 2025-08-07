@@ -60,3 +60,10 @@ class ProduceDispatcher(ResponseDispatcher):
                     timestamp=response.timestamp,
                 )
             )
+
+    async def link(
+        self, correlation_id: int, futures: list[asyncio.Future[record.RecordMetadata]]
+    ) -> None:
+        if correlation_id in self._pending_requests:
+            raise InvalidCorrelationIdError("already linked correlation id")
+        self._pending_requests[correlation_id] = futures
