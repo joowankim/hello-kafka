@@ -139,3 +139,33 @@ def test_list_topics(correlation_id: int, message: Message):
     msg = Message.list_topics(correlation_id=correlation_id)
 
     assert msg == message
+
+
+@pytest.mark.parametrize(
+    "correlation_id, payload, message",
+    [
+        (
+            1,
+            b'{"topic": "topic-1", "partition": 0, "records": [{"value": "value1"}]}',
+            (
+                1,
+                MessageType.PRODUCE,
+                b'{"topic": "topic-1", "partition": 0, "records": [{"value": "value1"}]}',
+            ),
+        ),
+        (
+            2,
+            b'{"topic": "topic-2", "partition": 1, "records": [{"value": "value2"}]}',
+            (
+                2,
+                MessageType.PRODUCE,
+                b'{"topic": "topic-2", "partition": 1, "records": [{"value": "value2"}]}',
+            ),
+        ),
+    ],
+    indirect=["message"],
+)
+def test_produce(correlation_id: int, payload: bytes, message: Message):
+    msg = Message.produce(correlation_id=correlation_id, payload=payload)
+
+    assert msg == message
