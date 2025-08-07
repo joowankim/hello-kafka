@@ -141,3 +141,39 @@ def test_from_message_with_invalid_message(
 ):
     with pytest.raises(error_type):
         Produce.from_message(message)
+
+
+@pytest.mark.parametrize(
+    "produce_command, expected",
+    [
+        (
+            Produce(
+                topic="test-topic",
+                partition=0,
+                records=[
+                    RecordContents(
+                        value="test-value", key=None, timestamp=None, headers={}
+                    ),
+                ],
+            ),
+            b'{"topic": "test-topic", "partition": 0, "records": [{"value": "test-value", "key": null, "timestamp": null, "headers": {}}]}',
+        ),
+        (
+            Produce(
+                topic="test-topic",
+                partition=0,
+                records=[
+                    RecordContents(
+                        value="test-value", key=None, timestamp=None, headers={}
+                    ),
+                    RecordContents(
+                        value="test-value", key=None, timestamp=None, headers={}
+                    ),
+                ],
+            ),
+            b'{"topic": "test-topic", "partition": 0, "records": [{"value": "test-value", "key": null, "timestamp": null, "headers": {}}, {"value": "test-value", "key": null, "timestamp": null, "headers": {}}]}',
+        ),
+    ],
+)
+def test_serialized(produce_command: Produce, expected: bytes):
+    assert produce_command.serialized == expected

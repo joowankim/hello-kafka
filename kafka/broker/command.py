@@ -36,11 +36,19 @@ class RecordContents(pydantic.BaseModel):
     timestamp: int | None
     headers: dict[str, str]
 
+    @property
+    def serialized(self) -> bytes:
+        return json.dumps(self.model_dump(mode="json")).encode("utf-8")
+
 
 class Produce(pydantic.BaseModel):
     topic: str
     partition: int
     records: list[RecordContents] = Field(min_length=1)
+
+    @property
+    def serialized(self) -> bytes:
+        return json.dumps(self.model_dump(mode="json")).encode("utf-8")
 
     @classmethod
     def from_message(cls, msg: message.Message) -> Self:

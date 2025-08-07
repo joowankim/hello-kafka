@@ -34,6 +34,13 @@ class MessageHeaders(BaseModel):
             api_key=MessageType.LIST_TOPICS,
         )
 
+    @classmethod
+    def produce(cls, correlation_id: int) -> Self:
+        return cls(
+            correlation_id=correlation_id,
+            api_key=MessageType.PRODUCE,
+        )
+
 
 class Message(BaseModel):
     headers: MessageHeaders
@@ -86,3 +93,8 @@ class Message(BaseModel):
     def list_topics(cls, correlation_id: int) -> Self:
         headers = MessageHeaders.list_topics(correlation_id)
         return cls(headers=headers, payload=b"")
+
+    @classmethod
+    def produce(cls, correlation_id: int, payload: bytes) -> Self:
+        headers = MessageHeaders.produce(correlation_id)
+        return cls(headers=headers, payload=payload)

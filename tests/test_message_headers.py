@@ -29,3 +29,17 @@ def test_list_topics(correlation_id: int, expected: MessageHeaders):
     headers = MessageHeaders.list_topics(correlation_id)
 
     assert headers == expected
+
+
+@pytest.mark.parametrize(
+    "correlation_id, expected",
+    [
+        (1, MessageHeaders(correlation_id=1, api_key=MessageType.PRODUCE)),
+        (2, MessageHeaders(correlation_id=2, api_key=MessageType.PRODUCE)),
+        (3, MessageHeaders(correlation_id=3, api_key=MessageType.PRODUCE)),
+    ],
+)
+def test_produce(correlation_id: int, expected: MessageHeaders):
+    headers = MessageHeaders.produce(correlation_id)
+
+    assert headers == expected

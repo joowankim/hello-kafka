@@ -1,8 +1,8 @@
 import asyncio
 from collections.abc import Callable
 
-from kafka import connection, message
-from kafka.admin import request, dispatcher
+from kafka import connection, message, dispatcher
+from kafka.admin import request
 
 
 class AdminClient:

@@ -10,11 +10,11 @@ class RecordMetadata(BaseModel):
 
 class ProducerRecord(BaseModel):
     topic: str
-    value: bytes
-    key: bytes | None = None
+    value: str
+    key: str | None = None
     partition: int | None = None
     timestamp: int | None = None
-    headers: dict[str, bytes] = Field(default_factory=dict)
+    headers: dict[str, str] = Field(default_factory=dict)
 
 
 class ConsumerRecord(BaseModel):

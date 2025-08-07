@@ -4,7 +4,7 @@ from unittest import mock
 
 import pytest
 
-from kafka.admin.dispatcher import ResponseDispatcher
+from kafka.dispatcher import ResponseDispatcher
 from kafka.connection import BrokerConnection
 from kafka.error import InvalidCorrelationIdError
 
