@@ -61,7 +61,7 @@ class ProduceDispatcher(ResponseDispatcher):
                 )
             )
 
-    async def link(
+    def link(
         self, correlation_id: int, futures: list[asyncio.Future[record.RecordMetadata]]
     ) -> None:
         if correlation_id in self._pending_requests:
